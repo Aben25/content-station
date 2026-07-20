@@ -22,6 +22,8 @@ export interface CaptureRecord {
   transcript?: string;
   srtPath?: string | null;
   plan?: ContentPlan;
+  postizDraftId?: string;
+  approvedPlatforms?: string[];
   status: DraftStatus;
   error?: string;
   createdAt: string;

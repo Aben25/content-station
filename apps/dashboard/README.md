@@ -1,19 +1,36 @@
-# Owner Dashboard (Phase 3)
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-Responsive Next.js dashboard for draft review, approvals, brand profile,
-station management, and publishing settings.
+## Getting Started
 
-Not scaffolded yet — this is Phase 3 of the build plan:
-
-1. ✅ Phase 1: Camera proof (Swift station + backend upload)
-2. ⬜ Phase 2: AI draft (processing pipeline + Hermes content plan)
-3. ⬜ Phase 3: Review & publishing (this dashboard + Postiz)
-4. ⬜ Phase 4: Pilot hardening
-
-When we start Phase 3:
+First, run the development server:
 
 ```bash
-npx create-next-app@latest . --typescript --tailwind --app
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-See `docs/content-station-app-structure.md` section 3 for the full dashboard spec.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

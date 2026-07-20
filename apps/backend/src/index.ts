@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import multipart from "@fastify/multipart";
+import cors from "@fastify/cors";
 import { createWriteStream } from "node:fs";
 import { mkdir, stat } from "node:fs/promises";
 import { pipeline as pipe } from "node:stream/promises";
@@ -15,6 +16,10 @@ const app = Fastify({ logger: true });
 await app.register(multipart, {
   limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB cap for 30s 1080p clips
 });
+
+// Dashboard runs on a different origin (localhost:3001, or the owner's
+// phone on the LAN) — allow cross-origin reads and the review POST.
+await app.register(cors, { origin: true });
 
 app.get("/health", async () => ({ status: "ok", service: "content-station-backend", queue: queue.stats }));
 
@@ -82,18 +87,54 @@ app.get<{ Params: { id: string } }>("/drafts/:id", async (req, reply) => {
   return rec;
 });
 
-app.post<{ Params: { id: string }; Body: { action: string } }>("/drafts/:id/review", async (req, reply) => {
+app.post<{
+  Params: { id: string };
+  Body: {
+    action: string;
+    selectedHook?: string;
+    captions?: { instagram?: string; tiktok?: string; facebook?: string };
+    cta?: string;
+    platforms?: string[];
+  };
+}>("/drafts/:id/review", async (req, reply) => {
   const rec = await store.get(req.params.id);
   if (!rec) return reply.code(404).send({ error: "not found" });
   if (rec.status !== "needs_review") return reply.code(409).send({ error: `draft is ${rec.status}` });
 
-  const { action } = req.body ?? {};
-  if (action === "approve") rec.status = "approved";
-  else if (action === "reject") rec.status = "rejected";
-  else return reply.code(400).send({ error: "action must be approve|reject" });
+  const { action, selectedHook, captions, cta, platforms } = req.body ?? {};
+
+  if (action === "approve") {
+    // Apply owner edits before approving
+    if (rec.plan) {
+      if (selectedHook && rec.plan.hookOptions.includes(selectedHook)) {
+        rec.plan.selectedHook = selectedHook;
+      }
+      if (captions) {
+        rec.plan.captions = { ...rec.plan.captions, ...captions };
+      }
+      if (cta) rec.plan.cta = cta;
+    }
+    rec.approvedPlatforms = platforms?.length ? platforms : rec.plan?.platforms;
+
+    try {
+      const { createPostizDraft } = await import("./postiz.js");
+      const result = await createPostizDraft(rec);
+      rec.postizDraftId = result.draftId;
+      req.log.info({ captureId: rec.captureId, postiz: result }, "approved → Postiz draft");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      req.log.error({ captureId: rec.captureId, err: message }, "Postiz draft failed");
+      return reply.code(502).send({ error: `Postiz failed: ${message}` });
+    }
+    rec.status = "approved";
+  } else if (action === "reject") {
+    rec.status = "rejected";
+  } else {
+    return reply.code(400).send({ error: "action must be approve|reject" });
+  }
 
   await store.save(rec);
-  return { captureId: rec.captureId, status: rec.status };
+  return { captureId: rec.captureId, status: rec.status, postizDraftId: rec.postizDraftId };
 });
 
 // Media serving for the dashboard preview (dev only; use signed URLs later)

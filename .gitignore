@@ -9,3 +9,7 @@ uploads/
 # Xcode
 derivedData/
 *.xcodeproj/xcuserdata/
+
+# Next.js
+.next/
+out/
