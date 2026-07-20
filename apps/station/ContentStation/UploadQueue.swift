@@ -22,8 +22,9 @@ struct UploadItem: Identifiable, Equatable {
 final class UploadQueue: ObservableObject {
     @Published private(set) var items: [UploadItem] = []
 
-    /// Phase 1 default: developer machine. Override in Settings (later phase).
-    var uploadBaseURL = URL(string: "http://localhost:3000")!
+    /// Developer machine on the local network. The iPhone reaches the backend
+    /// over Wi-Fi; override in Settings (later phase) for production.
+    var uploadBaseURL = URL(string: "http://10.0.0.230:3000")!
 
     private var isProcessing = false
 
