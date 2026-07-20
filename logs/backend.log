@@ -1,0 +1,24 @@
+{"level":30,"time":1784579368212,"pid":21934,"hostname":"Bens-MacBook-Pro.local","msg":"Server listening at http://127.0.0.1:3000"}
+{"level":30,"time":1784579368212,"pid":21934,"hostname":"Bens-MacBook-Pro.local","msg":"Server listening at http://10.0.0.230:3000"}
+{"level":30,"time":1784579526820,"pid":23552,"hostname":"Bens-MacBook-Pro.local","msg":"Server listening at http://127.0.0.1:3000"}
+{"level":30,"time":1784579526821,"pid":23552,"hostname":"Bens-MacBook-Pro.local","msg":"Server listening at http://10.0.0.230:3000"}
+{"level":30,"time":1784579545874,"pid":23552,"hostname":"Bens-MacBook-Pro.local","reqId":"req-1","req":{"method":"GET","url":"/health","host":"localhost:3000","remoteAddress":"127.0.0.1","remotePort":50879},"msg":"incoming request"}
+{"level":30,"time":1784579546200,"pid":23552,"hostname":"Bens-MacBook-Pro.local","reqId":"req-1","res":{"statusCode":200},"responseTime":322.49158299999544,"msg":"request completed"}
+{"level":30,"time":1784579547342,"pid":23552,"hostname":"Bens-MacBook-Pro.local","reqId":"req-2","req":{"method":"GET","url":"/drafts","host":"10.0.0.230:3000","remoteAddress":"10.0.0.230","remotePort":50888},"msg":"incoming request"}
+{"level":30,"time":1784579547344,"pid":23552,"hostname":"Bens-MacBook-Pro.local","reqId":"req-3","req":{"method":"GET","url":"/station/health","host":"10.0.0.230:3000","remoteAddress":"10.0.0.230","remotePort":50889},"msg":"incoming request"}
+{"level":30,"time":1784579547346,"pid":23552,"hostname":"Bens-MacBook-Pro.local","reqId":"req-3","res":{"statusCode":200},"responseTime":0.7509170000048471,"msg":"request completed"}
+{"level":30,"time":1784579547376,"pid":23552,"hostname":"Bens-MacBook-Pro.local","reqId":"req-2","res":{"statusCode":200},"responseTime":33.68187499999476,"msg":"request completed"}
+{"level":30,"time":1784579663290,"pid":24088,"hostname":"Bens-MacBook-Pro.local","msg":"Server listening at http://127.0.0.1:3000"}
+{"level":30,"time":1784579663290,"pid":24088,"hostname":"Bens-MacBook-Pro.local","msg":"Server listening at http://10.0.0.230:3000"}
+{"level":30,"time":1784579669044,"pid":24088,"hostname":"Bens-MacBook-Pro.local","reqId":"req-1","req":{"method":"GET","url":"/health","host":"localhost:3000","remoteAddress":"127.0.0.1","remotePort":50997},"msg":"incoming request"}
+{"level":30,"time":1784579669054,"pid":24088,"hostname":"Bens-MacBook-Pro.local","reqId":"req-1","res":{"statusCode":200},"responseTime":8.932958000000326,"msg":"request completed"}
+{"level":30,"time":1784579678494,"pid":24088,"hostname":"Bens-MacBook-Pro.local","reqId":"req-2","req":{"method":"GET","url":"/drafts/77d048c6-ca95-4929-82e9-889460749801","host":"localhost:3000","remoteAddress":"127.0.0.1","remotePort":51004},"msg":"incoming request"}
+{"level":30,"time":1784579678496,"pid":24088,"hostname":"Bens-MacBook-Pro.local","reqId":"req-2","res":{"statusCode":200},"responseTime":0.6544169999997393,"msg":"request completed"}
+{"level":30,"time":1784579688883,"pid":24088,"hostname":"Bens-MacBook-Pro.local","reqId":"req-3","req":{"method":"POST","url":"/drafts/77d048c6-ca95-4929-82e9-889460749801/review","host":"localhost:3000","remoteAddress":"127.0.0.1","remotePort":51012},"msg":"incoming request"}
+{"level":50,"time":1784579694671,"pid":24088,"hostname":"Bens-MacBook-Pro.local","reqId":"req-3","captureId":"77d048c6-ca95-4929-82e9-889460749801","err":"Postiz create post 400: {\"message\":[\"posts.0.settings.autoAddMusic must be one of the following values: yes, no\"],\"error\":\"Bad Request\",\"statusCode\":400}","msg":"Postiz draft failed"}
+{"level":30,"time":1784579694673,"pid":24088,"hostname":"Bens-MacBook-Pro.local","reqId":"req-3","res":{"statusCode":502},"responseTime":5789.354374999999,"msg":"request completed"}
+{"level":30,"time":1784579718352,"pid":24271,"hostname":"Bens-MacBook-Pro.local","msg":"Server listening at http://127.0.0.1:3000"}
+{"level":30,"time":1784579718352,"pid":24271,"hostname":"Bens-MacBook-Pro.local","msg":"Server listening at http://10.0.0.230:3000"}
+{"level":30,"time":1784579724195,"pid":24271,"hostname":"Bens-MacBook-Pro.local","reqId":"req-1","req":{"method":"POST","url":"/drafts/77d048c6-ca95-4929-82e9-889460749801/review","host":"localhost:3000","remoteAddress":"127.0.0.1","remotePort":51037},"msg":"incoming request"}
+{"level":30,"time":1784579729506,"pid":24271,"hostname":"Bens-MacBook-Pro.local","reqId":"req-1","captureId":"77d048c6-ca95-4929-82e9-889460749801","postiz":{"draftId":"cmrtoozx4084mqj0y3pz5s4r5","mode":"live"},"msg":"approved → Postiz draft"}
+{"level":30,"time":1784579729513,"pid":24271,"hostname":"Bens-MacBook-Pro.local","reqId":"req-1","res":{"statusCode":200},"responseTime":5316.745792,"msg":"request completed"}

@@ -1,0 +1,6 @@
+Starting Hermes proxy for Nous Portal
+  Listening on:  http://127.0.0.1:8645/v1
+  Forwarding to: (resolved per-request from your subscription)
+  Use any bearer token in the client — the proxy attaches your real credential.
+
+Press Ctrl+C to stop.
