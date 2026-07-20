@@ -86,10 +86,25 @@ create Postiz draft. Config-gated — set `POSTIZ_API_URL`, `POSTIZ_API_KEY`,
 `POSTIZ_INTEGRATION_IDS` to go live. Until then, approvals record a stub
 draft ID so the flow is fully testable.
 
-## Next up (Phase 4 — Pilot hardening)
+## Phase 4 status — Pilot hardening ✅
 
-- Offline upload recovery + station health endpoint (partially done)
-- Storage retention + deletion controls
-- Duplicate-publishing prevention
-- Real Hermes LLM plans (set `CONTENT_LLM_*`)
+- **Real Hermes LLM plans**: backend talks to `hermes proxy` (Nous Portal)
+  by default — `hermes proxy start --provider nous` must be running.
+  Hooks/captions now come from the transcript, not templates.
+- **Prohibited claims**: set `PROHIBITED_CLAIMS="phrase1,phrase2"` — the LLM
+  is instructed to avoid them and a post-check scrubs any that slip through.
+- **Duplicate-publish prevention**: SHA-256 of the raw file blocks
+  re-approving identical footage (409 with the original capture ID).
+- **Privacy**: `DELETE /drafts/:id` removes everything; raw video is purged
+  after `RAW_RETENTION_DAYS` (default 7, spec range 1–30).
+- **Station health**: `GET /station/health` (online, last seen, uploads,
+  retention) shown on the dashboard home.
+
+## Remaining before the pilot
+
+- Test the station app on a physical iPhone (open
+  `apps/station/ContentStation.xcodeproj` in Xcode, sign with your Apple ID,
+  run on device — it uploads to `http://10.0.0.230:3000`)
+- Set `BUSINESS_NAME`, `BUSINESS_CATEGORY`, `DEFAULT_CTA` etc. for the real business
+- Set `POSTIZ_API_URL`, `POSTIZ_API_KEY`, `POSTIZ_INTEGRATION_IDS` for live drafts
 - Seven-day real-business pilot
