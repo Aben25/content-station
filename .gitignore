@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+derivedData/
+build/
+.env
+*.local
+uploads/
+
+# Xcode
+derivedData/
+*.xcodeproj/xcuserdata/
