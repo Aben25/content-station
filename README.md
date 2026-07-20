@@ -67,8 +67,29 @@ Hermes plans use a deterministic fallback until you set:
 `CONTENT_LLM_BASE_URL`, `CONTENT_LLM_API_KEY`, `CONTENT_LLM_MODEL`
 (any OpenAI-compatible endpoint).
 
-## Next up (Phase 3 — Review & publishing)
+## Phase 3 status — Review & publishing ✅
 
-- Next.js owner dashboard: draft review cards, video preview, hook picker,
-  caption editing, approve/reject
-- Postiz media upload + draft creation on approve
+**Dashboard** (`apps/dashboard`, Next.js on :3001):
+
+```bash
+cd apps/dashboard
+npm install
+npm run dev   # http://localhost:3001
+```
+
+- Home: today stats (captured / ready / posted) + draft cards with thumbnails
+- Review screen: branded video preview, 3-hook picker, caption + CTA editing,
+  platform toggles, warnings panel, Approve to Postiz / Reject
+
+**Postiz** (`apps/backend/src/postiz.ts`): approve → upload branded MP4 →
+create Postiz draft. Config-gated — set `POSTIZ_API_URL`, `POSTIZ_API_KEY`,
+`POSTIZ_INTEGRATION_IDS` to go live. Until then, approvals record a stub
+draft ID so the flow is fully testable.
+
+## Next up (Phase 4 — Pilot hardening)
+
+- Offline upload recovery + station health endpoint (partially done)
+- Storage retention + deletion controls
+- Duplicate-publishing prevention
+- Real Hermes LLM plans (set `CONTENT_LLM_*`)
+- Seven-day real-business pilot
