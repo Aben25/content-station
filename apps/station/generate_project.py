@@ -115,6 +115,7 @@ base_target = {
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "CODE_SIGN_STYLE": "Automatic",
     "CURRENT_PROJECT_VERSION": "1",
+    "DEVELOPMENT_TEAM": "HP284BJ924",
     "GENERATE_INFOPLIST_FILE": "NO",
     "INFOPLIST_FILE": "ContentStation/Info.plist",
     "IPHONEOS_DEPLOYMENT_TARGET": "17.0",
