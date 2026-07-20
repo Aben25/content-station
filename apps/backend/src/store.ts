@@ -24,6 +24,7 @@ export interface CaptureRecord {
   plan?: ContentPlan;
   postizDraftId?: string;
   approvedPlatforms?: string[];
+  contentHash?: string;
   status: DraftStatus;
   error?: string;
   createdAt: string;
@@ -52,6 +53,19 @@ export class Store {
     this.cache.set(rec.captureId, rec);
     await mkdir(path.dirname(this.recordPath(rec.captureId)), { recursive: true });
     await writeFile(this.recordPath(rec.captureId), JSON.stringify(rec, null, 2));
+  }
+
+  evict(captureId: string): void {
+    this.cache.delete(captureId);
+  }
+
+  /// Duplicate-publish prevention: find another capture with identical
+  /// content (same SHA-256) that already reached Postiz.
+  async findDuplicate(contentHash: string, excludeId: string): Promise<CaptureRecord | undefined> {
+    const all = await this.list();
+    return all.find(
+      (r) => r.captureId !== excludeId && r.contentHash === contentHash && r.status === "approved",
+    );
   }
 
   async list(): Promise<CaptureRecord[]> {

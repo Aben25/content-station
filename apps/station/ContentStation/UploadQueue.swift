@@ -30,6 +30,7 @@ final class UploadQueue: ObservableObject {
 
     init() {
         rescanFromDisk()
+        pingBackend()
         NotificationCenter.default.addObserver(
             forName: .captureSaved,
             object: nil,
@@ -40,6 +41,22 @@ final class UploadQueue: ObservableObject {
                 self?.enqueue(url)
             }
         }
+    }
+
+    /// Let the backend know the station is alive (dashboard "online" status).
+    private func pingBackend() {
+        Task.detached { [uploadBaseURL] in
+            var req = URLRequest(url: uploadBaseURL.appendingPathComponent("station/ping"))
+            req.httpMethod = "POST"
+            _ = try? await URLSession.shared.data(for: req)
+        }
+    }
+
+    /// Free disk space for the station health screen (bytes).
+    func freeDiskSpace() -> Int64 {
+        let url = URL(fileURLWithPath: NSHomeDirectory())
+        let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+        return Int64(values?.volumeAvailableCapacityForImportantUsage ?? 0)
     }
 
     func rescanFromDisk() {

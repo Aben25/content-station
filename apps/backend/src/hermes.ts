@@ -26,20 +26,20 @@ const FALLBACK_HOOKS = [
 ];
 
 /// Ask the configured LLM for a structured content plan. Falls back to a
-/// deterministic template plan when no LLM endpoint is configured, so the
+/// deterministic template plan when the LLM endpoint is unreachable, so the
 /// pipeline always produces a reviewable draft.
 export async function generateContentPlan(input: PlanInput): Promise<ContentPlan> {
-  const b = config.brand;
-
   if (config.llmBaseUrl && config.llmApiKey) {
     try {
-      return await llmPlan(input);
+      const plan = await llmPlan(input);
+      return enforceProhibited(plan);
     } catch (err) {
       console.warn("[hermes] LLM plan failed, using fallback:", err);
     }
   }
 
-  // Deterministic fallback (no LLM configured)
+  // Deterministic fallback (LLM unreachable)
+  const b = config.brand;
   const excerpt = input.transcript.split(" ").slice(0, 12).join(" ");
   const hook = excerpt ? `"${excerpt}…"` : FALLBACK_HOOKS[0];
   return {
@@ -60,15 +60,37 @@ export async function generateContentPlan(input: PlanInput): Promise<ContentPlan
     warnings: [
       ...input.probeWarnings,
       ...(input.transcript ? [] : ["no speech detected — relying on visuals"]),
-      "AI plan generated without LLM (set CONTENT_LLM_BASE_URL for Hermes plans)",
+      "AI plan generated without LLM (Hermes endpoint unreachable)",
     ],
   };
 }
 
+/// Hard guard: even if the LLM slips, prohibited claims never reach the
+/// owner. Offending captions are replaced with a safe default and flagged.
+function enforceProhibited(plan: ContentPlan): ContentPlan {
+  const banned = config.brand.prohibitedClaims.map((s) => s.toLowerCase());
+  if (banned.length === 0) return plan;
+
+  const fields: Array<[keyof ContentPlan["captions"], string]> = [
+    ["instagram", plan.captions.instagram],
+    ["tiktok", plan.captions.tiktok],
+    ["facebook", plan.captions.facebook],
+  ];
+  for (const [key, text] of fields) {
+    const hit = banned.find((phrase) => text.toLowerCase().includes(phrase));
+    if (hit) {
+      plan.captions[key] = `A moment from today at ${config.brand.businessName}. ${config.brand.defaultCta}`;
+      plan.warnings = [...(plan.warnings ?? []), `prohibited claim "${hit}" removed from ${key} caption`];
+    }
+  }
+  return plan;
+}
+
 async function llmPlan(input: PlanInput): Promise<ContentPlan> {
   const b = config.brand;
-  const system = `You are Hermes, the content director for ${b.businessName}, a ${b.category}.
-Brand voice matters. Never use prohibited claims: ${b.prohibitedClaims.join(", ") || "none"}.
+  const system = `You are Hermes, the content director for ${b.businessName}, a ${b.category}${b.location ? ` in ${b.location}` : ""}.
+Target audience: ${b.audience}. Brand tone: ${b.tone}.
+Never use prohibited claims: ${b.prohibitedClaims.join(", ") || "none"}.
 Default CTA: ${b.defaultCta}.
 Return ONLY valid JSON matching this exact shape:
 {"usable":bool,"angle":string,"hookOptions":[3 strings],"selectedHook":string,

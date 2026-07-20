@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { fetchDrafts, mediaUrl, type Draft } from "@/lib/api";
+import { fetchDrafts, fetchStationHealth, mediaUrl, type Draft, type StationHealth } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +65,10 @@ function DraftCard({ draft }: { draft: Draft }) {
 }
 
 export default async function Home() {
-  const drafts = await fetchDrafts().catch(() => [] as Draft[]);
+  const [drafts, station] = await Promise.all([
+    fetchDrafts().catch(() => [] as Draft[]),
+    fetchStationHealth().catch(() => null as StationHealth | null),
+  ]);
 
   const today = new Date().toDateString();
   const todays = drafts.filter((d) => new Date(d.createdAt).toDateString() === today);
@@ -83,6 +86,22 @@ export default async function Home() {
         <StatCard label="Ready" value={needsReview.length} />
         <StatCard label="Posted" value={approved.length} />
       </div>
+
+      {station && (
+        <div className="mt-4 flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm">
+          <span
+            className={`h-2.5 w-2.5 rounded-full ${station.online ? "bg-green-500" : "bg-zinc-600"}`}
+          />
+          <span className="text-zinc-300">
+            Station {station.online ? "online" : "offline"}
+            {station.lastSeen &&
+              ` · last seen ${new Date(station.lastSeen).toLocaleTimeString()}`}
+          </span>
+          <span className="ml-auto text-zinc-500">
+            {station.totalUploads} uploads · raw kept {station.retentionDays}d
+          </span>
+        </div>
+      )}
 
       {processing.length > 0 && (
         <>

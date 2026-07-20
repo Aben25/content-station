@@ -12,15 +12,20 @@ export const config = {
   whisperModel:
     process.env.WHISPER_MODEL ?? path.join(TOOLS, "models/ggml-base.en.bin"),
 
-  // Hermes content plan generation. Uses an OpenAI-compatible endpoint —
-  // set CONTENT_LLM_BASE_URL + CONTENT_LLM_API_KEY to enable real plans.
-  llmBaseUrl: process.env.CONTENT_LLM_BASE_URL ?? "",
-  llmApiKey: process.env.CONTENT_LLM_API_KEY ?? "",
-  llmModel: process.env.CONTENT_LLM_MODEL ?? "openai/gpt-4o-mini",
+  // Hermes content plan generation. Uses an OpenAI-compatible endpoint.
+  // Default: local Hermes proxy (hermes proxy start --provider nous) which
+  // forwards to the Nous Portal subscription with real credentials.
+  llmBaseUrl: process.env.CONTENT_LLM_BASE_URL ?? "http://127.0.0.1:8645/v1",
+  llmApiKey: process.env.CONTENT_LLM_API_KEY ?? "content-station",
+  llmModel: process.env.CONTENT_LLM_MODEL ?? "x-ai/grok-4.5",
 
   brand: {
     businessName: process.env.BUSINESS_NAME ?? "Demo Business",
     category: process.env.BUSINESS_CATEGORY ?? "local business",
+    location: process.env.BUSINESS_LOCATION ?? "",
+    timezone: process.env.BUSINESS_TIMEZONE ?? "America/New_York",
+    audience: process.env.TARGET_AUDIENCE ?? "local customers",
+    tone: process.env.BRAND_TONE ?? "friendly and energetic",
     primaryColor: process.env.BRAND_COLOR ?? "#FFFFFF",
     defaultCta: process.env.DEFAULT_CTA ?? "Come see us today!",
     prohibitedClaims: (process.env.PROHIBITED_CLAIMS ?? "")
@@ -28,4 +33,7 @@ export const config = {
       .map((s) => s.trim())
       .filter(Boolean),
   },
+
+  // Pilot hardening
+  rawRetentionDays: Number(process.env.RAW_RETENTION_DAYS ?? 7),
 } as const;

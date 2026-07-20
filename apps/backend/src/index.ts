@@ -5,13 +5,20 @@ import { createWriteStream } from "node:fs";
 import { mkdir, stat } from "node:fs/promises";
 import { pipeline as pipe } from "node:stream/promises";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { config } from "./config.js";
 import { queue } from "./queue.js";
 import { store, type CaptureRecord } from "./store.js";
 import { enqueuePipeline, requeueInterrupted } from "./pipeline.js";
+import { deleteCapture, startRetentionTimer } from "./housekeeping.js";
 
 const app = Fastify({ logger: true });
+
+/// Station health: last time any station contacted the backend.
+/// Phase 4 has one implicit station; multi-station registry comes later.
+let stationLastSeen: string | null = null;
+let stationUploadCount = 0;
 
 await app.register(multipart, {
   limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB cap for 30s 1080p clips
@@ -22,6 +29,21 @@ await app.register(multipart, {
 await app.register(cors, { origin: true });
 
 app.get("/health", async () => ({ status: "ok", service: "content-station-backend", queue: queue.stats }));
+
+/// Station health for the dashboard's Station Management card.
+app.get("/station/health", async () => ({
+  online: stationLastSeen ? Date.now() - new Date(stationLastSeen).getTime() < 5 * 60 * 1000 : false,
+  lastSeen: stationLastSeen,
+  totalUploads: stationUploadCount,
+  queue: queue.stats,
+  retentionDays: config.rawRetentionDays,
+}));
+
+/// Station pings this on launch so the dashboard can show "online".
+app.post("/station/ping", async () => {
+  stationLastSeen = new Date().toISOString();
+  return { ok: true };
+});
 
 // --- Capture ingest -------------------------------------------------------
 
@@ -40,12 +62,18 @@ app.post("/upload", async (req, reply) => {
   await pipe(file.file, createWriteStream(rawPath));
 
   const { size } = await stat(rawPath);
+  stationLastSeen = new Date().toISOString();
+  stationUploadCount++;
+
+  // Content hash for duplicate-publish prevention
+  const contentHash = createHash("sha256").update(await readFile(rawPath)).digest("hex");
 
   const rec: CaptureRecord = {
     captureId,
     filename: file.filename || `raw${ext}`,
     bytes: size,
     rawPath,
+    contentHash,
     status: "processing",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -104,6 +132,16 @@ app.post<{
   const { action, selectedHook, captions, cta, platforms } = req.body ?? {};
 
   if (action === "approve") {
+    // Duplicate-publish prevention: same footage already approved before
+    if (rec.contentHash) {
+      const dup = await store.findDuplicate(rec.contentHash, rec.captureId);
+      if (dup) {
+        return reply.code(409).send({
+          error: `Duplicate footage — already approved as capture ${dup.captureId} (Postiz draft ${dup.postizDraftId ?? "?"})`,
+        });
+      }
+    }
+
     // Apply owner edits before approving
     if (rec.plan) {
       if (selectedHook && rec.plan.hookOptions.includes(selectedHook)) {
@@ -137,6 +175,14 @@ app.post<{
   return { captureId: rec.captureId, status: rec.status, postizDraftId: rec.postizDraftId };
 });
 
+/// Privacy: permanently delete a capture and all its files.
+app.delete<{ Params: { id: string } }>("/drafts/:id", async (req, reply) => {
+  const deleted = await deleteCapture(req.params.id);
+  if (!deleted) return reply.code(404).send({ error: "not found" });
+  req.log.info({ captureId: req.params.id }, "capture deleted");
+  return { deleted: req.params.id };
+});
+
 // Media serving for the dashboard preview (dev only; use signed URLs later)
 app.get<{ Params: { id: string; kind: string } }>("/media/:id/:kind", async (req, reply) => {
   const rec = await store.get(req.params.id);
@@ -161,6 +207,7 @@ try {
   await app.listen({ port: config.port, host: "0.0.0.0" });
   const recovered = await requeueInterrupted();
   if (recovered > 0) app.log.info(`requeued ${recovered} interrupted capture(s)`);
+  startRetentionTimer();
 } catch (err) {
   app.log.error(err);
   process.exit(1);

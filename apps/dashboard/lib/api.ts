@@ -69,3 +69,17 @@ export async function submitReview(
 export function mediaUrl(id: string, kind: "raw" | "thumb" | "branded"): string {
   return `${API_BASE}/media/${id}/${kind}`;
 }
+
+export interface StationHealth {
+  online: boolean;
+  lastSeen: string | null;
+  totalUploads: number;
+  queue: { pending: number; running: boolean; completed: number; failed: number };
+  retentionDays: number;
+}
+
+export async function fetchStationHealth(): Promise<StationHealth> {
+  const res = await fetch(`${API_BASE}/station/health`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`station health ${res.status}`);
+  return res.json();
+}
