@@ -49,9 +49,26 @@ Endpoints:
 - `POST /upload` — multipart video upload → stores under `uploads/<captureId>/raw.mp4`
 - `GET /captures` — list stored captures (dashboard stub)
 
-## Next up (Phase 2 — AI draft)
+## Phase 2 status — AI draft ✅
 
-- Video inspection (ffprobe), thumbnails, transcription (Whisper)
-- Hermes content plan (hooks, captions, CTA, hashtags)
-- Branded 9:16 render via FFmpeg worker
-- Draft-ready notification
+Pipeline (auto-runs after each upload): probe → thumbnail → whisper
+transcript → Hermes content plan → branded 9:16 render → `needs_review`.
+
+New endpoints:
+- `GET /drafts` / `GET /drafts/:id` — draft list + full record (plan, transcript, probe)
+- `POST /drafts/:id/review` `{action: "approve"|"reject"}` — owner decision
+- `GET /media/:id/raw|thumb|branded` — media streaming for the dashboard
+
+Tools (installed locally, no Homebrew):
+- `tools/bin/ffmpeg`, `tools/bin/ffprobe` (static arm64 builds)
+- whisper.cpp `whisper-cli` (built from source) + `tools/models/ggml-base.en.bin`
+
+Hermes plans use a deterministic fallback until you set:
+`CONTENT_LLM_BASE_URL`, `CONTENT_LLM_API_KEY`, `CONTENT_LLM_MODEL`
+(any OpenAI-compatible endpoint).
+
+## Next up (Phase 3 — Review & publishing)
+
+- Next.js owner dashboard: draft review cards, video preview, hook picker,
+  caption editing, approve/reject
+- Postiz media upload + draft creation on approve
