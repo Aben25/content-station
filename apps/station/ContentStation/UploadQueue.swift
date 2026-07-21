@@ -22,9 +22,9 @@ struct UploadItem: Identifiable, Equatable {
 final class UploadQueue: ObservableObject {
     @Published private(set) var items: [UploadItem] = []
 
-    /// Developer machine on the local network. The iPhone reaches the backend
-    /// over Wi-Fi; override in Settings (later phase) for production.
-    var uploadBaseURL = URL(string: "http://10.0.0.230:3000")!
+    /// Public HTTPS endpoint via Cloudflare Tunnel — works from any network.
+    /// Named tunnel on your domain replaces this temporary URL later.
+    var uploadBaseURL = URL(string: "https://affair-breaking-assessment-inquiry.trycloudflare.com")!
 
     private var isProcessing = false
 

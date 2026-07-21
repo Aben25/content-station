@@ -22,6 +22,8 @@ IDS = {
 for f in SWIFT_FILES:
     IDS[f"fileref_{f}"] = gid()
     IDS[f"buildfile_{f}"] = gid()
+IDS["assets_ref"] = gid()
+IDS["assets_buildfile"] = gid()
 
 objects = {}
 
@@ -40,7 +42,7 @@ objects[IDS["project"]] = {
     "targets": [IDS["target"]],
 }
 
-children = [IDS[f"fileref_{f}"] for f in SWIFT_FILES] + [IDS["info_plist_ref"]]
+children = [IDS[f"fileref_{f}"] for f in SWIFT_FILES] + [IDS["info_plist_ref"], IDS["assets_ref"]]
 objects[IDS["src_group"]] = {
     "isa": "PBXGroup", "children": children, "path": "ContentStation", "sourceTree": "<group>",
 }
@@ -68,6 +70,13 @@ for f in SWIFT_FILES:
         "isa": "PBXBuildFile", "fileRef": IDS[f"fileref_{f}"],
     }
 
+objects[IDS["assets_ref"]] = {
+    "isa": "PBXFileReference", "lastKnownFileType": "folder.assetcatalog",
+    "path": "Assets.xcassets", "sourceTree": "<group>",
+}
+objects[IDS["assets_buildfile"]] = {
+    "isa": "PBXBuildFile", "fileRef": IDS["assets_ref"],
+}
 objects[IDS["sources_phase"]] = {
     "isa": "PBXSourcesBuildPhase", "buildActionMask": 2147483647,
     "files": [IDS[f"buildfile_{f}"] for f in SWIFT_FILES], "runOnlyForDeploymentPostprocessing": 0,
@@ -77,7 +86,8 @@ objects[IDS["frameworks_phase"]] = {
     "runOnlyForDeploymentPostprocessing": 0,
 }
 objects[IDS["resources_phase"]] = {
-    "isa": "PBXResourcesBuildPhase", "buildActionMask": 2147483647, "files": [],
+    "isa": "PBXResourcesBuildPhase", "buildActionMask": 2147483647,
+    "files": [IDS["assets_buildfile"]],
     "runOnlyForDeploymentPostprocessing": 0,
 }
 
