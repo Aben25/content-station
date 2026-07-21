@@ -13,6 +13,7 @@ import { queue } from "./queue.js";
 import { store, type CaptureRecord } from "./store.js";
 import { enqueuePipeline, requeueInterrupted } from "./pipeline.js";
 import { deleteCapture, startRetentionTimer } from "./housekeeping.js";
+import { registerAuth } from "./auth.js";
 
 const app = Fastify({ logger: true });
 
@@ -25,9 +26,13 @@ await app.register(multipart, {
   limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB cap for 30s 1080p clips
 });
 
-// Dashboard runs on a different origin (localhost:3001, or the owner's
-// phone on the LAN) — allow cross-origin reads and the review POST.
-await app.register(cors, { origin: true });
+// The dashboard proxies through its own server, so no browser ever calls this
+// API directly. Keep CORS pinned to the dashboard origin anyway.
+await app.register(cors, { origin: config.corsOrigin });
+
+// Every route below is authenticated except /health. Station tokens may only
+// upload and ping; the dashboard's owner token may do everything.
+registerAuth(app);
 
 app.get("/health", async () => ({ status: "ok", service: "content-station-backend", queue: queue.stats }));
 

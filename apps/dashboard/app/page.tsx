@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { fetchDrafts, fetchStationHealth, mediaUrl, type Draft, type StationHealth } from "@/lib/api";
+import { mediaUrl, type Draft, type StationHealth } from "@/lib/api";
+import { fetchDrafts, fetchStationHealth } from "@/lib/backend";
 
 export const dynamic = "force-dynamic";
 

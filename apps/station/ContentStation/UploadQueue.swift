@@ -22,13 +22,16 @@ struct UploadItem: Identifiable, Equatable {
 final class UploadQueue: ObservableObject {
     @Published private(set) var items: [UploadItem] = []
 
-    /// Public HTTPS endpoint via Cloudflare Tunnel — works from any network.
-    /// Named tunnel on your domain replaces this temporary URL later.
-    var uploadBaseURL = URL(string: "https://affair-breaking-assessment-inquiry.trycloudflare.com")!
+    /// Backend URL + station token, entered once on the device. Captures still
+    /// record and queue on disk while unconfigured; they upload once it is set.
+    private let config: StationConfig
 
     private var isProcessing = false
 
-    init() {
+    // Default argument is resolved in the initialiser body, not at the call
+    // site, so the main-actor `shared` is only touched from the main actor.
+    init(config: StationConfig? = nil) {
+        self.config = config ?? .shared
         rescanFromDisk()
         pingBackend()
         NotificationCenter.default.addObserver(
@@ -45,11 +48,20 @@ final class UploadQueue: ObservableObject {
 
     /// Let the backend know the station is alive (dashboard "online" status).
     private func pingBackend() {
-        Task.detached { [uploadBaseURL] in
-            var req = URLRequest(url: uploadBaseURL.appendingPathComponent("station/ping"))
-            req.httpMethod = "POST"
-            _ = try? await URLSession.shared.data(for: req)
+        guard let request = authorizedRequest(path: "station/ping", method: "POST") else { return }
+        Task.detached {
+            _ = try? await URLSession.shared.data(for: request)
         }
+    }
+
+    /// Builds a request against the configured backend with the station token
+    /// attached. Returns nil when the station has not been set up yet.
+    private func authorizedRequest(path: String, method: String) -> URLRequest? {
+        guard let baseURL = config.baseURL, let token = config.token else { return nil }
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.httpMethod = method
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return request
     }
 
     /// Free disk space for the station health screen (bytes).
@@ -124,8 +136,11 @@ final class UploadQueue: ObservableObject {
 
     private func upload(_ fileURL: URL,
                         progress: @escaping (Double) -> Void) async throws -> String {
-        var request = URLRequest(url: uploadBaseURL.appendingPathComponent("upload"))
-        request.httpMethod = "POST"
+        guard var request = authorizedRequest(path: "upload", method: "POST") else {
+            throw NSError(domain: "UploadQueue", code: -1, userInfo: [
+                NSLocalizedDescriptionKey: "Station not set up — add the backend URL and token in Setup",
+            ])
+        }
 
         let boundary = "Boundary-\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)",
@@ -146,8 +161,11 @@ final class UploadQueue: ObservableObject {
 
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let message = (code == 401 || code == 403)
+                ? "Station token rejected — re-run Setup"
+                : "Server returned \(code)"
             throw NSError(domain: "UploadQueue", code: code,
-                          userInfo: [NSLocalizedDescriptionKey: "Server returned \(code)"])
+                          userInfo: [NSLocalizedDescriptionKey: message])
         }
         return try JSONDecoder().decode(UploadResponse.self, from: data).captureId
     }

@@ -1,16 +1,33 @@
 import path from "node:path";
-import os from "node:os";
+import { fileURLToPath } from "node:url";
 
-const TOOLS = path.resolve(os.homedir(), "Projects/content-station/tools");
+// apps/backend/src/config.ts → repo root → tools/. Resolved from this file so
+// the backend runs from a clone in any directory, not just ~/Projects.
+const TOOLS = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "../../../tools");
+
+/// ffmpeg's drawtext wants `0xRRGGBB`, not `#RRGGBB`, and rejects an empty
+/// string outright — which is what an unquoted `BRAND_COLOR=#FFFFFF` produces,
+/// since dotenv reads the `#` as a comment. Normalise, and fall back to white
+/// so a bad brand colour can never break every render.
+function ffmpegColor(raw: string | undefined): string {
+  const hex = (raw ?? "").trim().replace(/^#/, "").replace(/^0x/i, "");
+  return /^[0-9a-f]{6}$/i.test(hex) ? `0x${hex.toUpperCase()}` : "0xFFFFFF";
+}
 
 export const config = {
   port: Number(process.env.PORT ?? 3000),
+  corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:3001",
   uploadDir: path.resolve(process.cwd(), "uploads"),
   ffmpeg: process.env.FFMPEG_PATH ?? path.join(TOOLS, "bin/ffmpeg"),
   ffprobe: process.env.FFPROBE_PATH ?? path.join(TOOLS, "bin/ffprobe"),
-  whisperCli: process.env.WHISPER_CLI ?? "/tmp/whisper.cpp/build/bin/whisper-cli",
+  whisperCli: process.env.WHISPER_CLI ?? path.join(TOOLS, "whisper/whisper-cli"),
   whisperModel:
     process.env.WHISPER_MODEL ?? path.join(TOOLS, "models/ggml-base.en.bin"),
+
+  auth: {
+    stationToken: process.env.STATION_TOKEN ?? "",
+    ownerToken: process.env.OWNER_TOKEN ?? "",
+  },
 
   // Hermes content plan generation. Uses an OpenAI-compatible endpoint.
   // Default: local Hermes proxy (hermes proxy start --provider nous) which
@@ -26,7 +43,7 @@ export const config = {
     timezone: process.env.BUSINESS_TIMEZONE ?? "America/New_York",
     audience: process.env.TARGET_AUDIENCE ?? "local customers",
     tone: process.env.BRAND_TONE ?? "friendly and energetic",
-    primaryColor: process.env.BRAND_COLOR ?? "#FFFFFF",
+    primaryColor: ffmpegColor(process.env.BRAND_COLOR),
     defaultCta: process.env.DEFAULT_CTA ?? "Come see us today!",
     prohibitedClaims: (process.env.PROHIBITED_CLAIMS ?? "")
       .split(",")

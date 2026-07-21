@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { fetchDraft } from "@/lib/api";
+import { fetchDraft } from "@/lib/backend";
 import ReviewClient from "./ReviewClient";
 
 export const dynamic = "force-dynamic";

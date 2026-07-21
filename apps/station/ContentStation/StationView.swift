@@ -6,6 +6,9 @@ import SwiftUI
 struct StationView: View {
     @EnvironmentObject var camera: CameraController
     @EnvironmentObject var uploader: UploadQueue
+    @EnvironmentObject var config: StationConfig
+
+    @State private var showSetup = false
 
     var body: some View {
         ZStack {
@@ -20,6 +23,10 @@ struct StationView: View {
         }
         .task {
             await camera.configure()
+            if !config.isConfigured { showSetup = true }
+        }
+        .sheet(isPresented: $showSetup) {
+            SetupSheet()
         }
     }
 
@@ -153,8 +160,12 @@ struct StationView: View {
 
     private var footer: some View {
         HStack(spacing: 20) {
-            Label("Wi-Fi", systemImage: "wifi")
-                .foregroundStyle(.green)
+            Button {
+                showSetup = true
+            } label: {
+                Label(config.isConfigured ? "Linked" : "Set up", systemImage: config.isConfigured ? "link" : "exclamationmark.triangle")
+                    .foregroundStyle(config.isConfigured ? .green : .yellow)
+            }
             Text("Uploads: \(uploader.pendingCount)")
                 .foregroundStyle(.white.opacity(0.8))
             Spacer()
@@ -196,5 +207,6 @@ struct StationView: View {
     StationView()
         .environmentObject(CameraController())
         .environmentObject(UploadQueue())
+        .environmentObject(StationConfig())
         .preferredColorScheme(.dark)
 }

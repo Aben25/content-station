@@ -1,5 +1,7 @@
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:3000";
+// Client-safe module: types, and the two calls the browser makes. The browser
+// never talks to the backend directly — it goes through this app's own route
+// handlers, so the owner token stays on the dashboard server. Server-side
+// fetching lives in lib/backend.ts.
 
 export interface ContentPlan {
   usable: boolean;
@@ -32,16 +34,12 @@ export interface DraftDetail extends Draft {
   approvedPlatforms?: string[];
 }
 
-export async function fetchDrafts(): Promise<Draft[]> {
-  const res = await fetch(`${API_BASE}/drafts`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`drafts ${res.status}`);
-  return (await res.json()).drafts;
-}
-
-export async function fetchDraft(id: string): Promise<DraftDetail> {
-  const res = await fetch(`${API_BASE}/drafts/${id}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`draft ${res.status}`);
-  return res.json();
+export interface StationHealth {
+  online: boolean;
+  lastSeen: string | null;
+  totalUploads: number;
+  queue: { pending: number; running: boolean; completed: number; failed: number };
+  retentionDays: number;
 }
 
 export async function submitReview(
@@ -54,7 +52,7 @@ export async function submitReview(
     platforms?: string[];
   },
 ): Promise<{ captureId: string; status: string; postizDraftId?: string }> {
-  const res = await fetch(`${API_BASE}/drafts/${id}/review`, {
+  const res = await fetch(`/api/drafts/${id}/review`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -67,19 +65,5 @@ export async function submitReview(
 }
 
 export function mediaUrl(id: string, kind: "raw" | "thumb" | "branded"): string {
-  return `${API_BASE}/media/${id}/${kind}`;
-}
-
-export interface StationHealth {
-  online: boolean;
-  lastSeen: string | null;
-  totalUploads: number;
-  queue: { pending: number; running: boolean; completed: number; failed: number };
-  retentionDays: number;
-}
-
-export async function fetchStationHealth(): Promise<StationHealth> {
-  const res = await fetch(`${API_BASE}/station/health`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`station health ${res.status}`);
-  return res.json();
+  return `/api/media/${id}/${kind}`;
 }

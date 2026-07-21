@@ -14,3 +14,6 @@ derivedData/
 .next/
 out/
 tools/models/ggml-base.en.bin
+
+# Runtime logs
+logs/
