@@ -13,3 +13,4 @@ derivedData/
 # Next.js
 .next/
 out/
+tools/models/ggml-base.en.bin
