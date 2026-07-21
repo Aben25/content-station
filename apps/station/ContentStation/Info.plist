@@ -20,6 +20,12 @@
 	<string>0.1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>FirebaseAPIKey</key>
+	<string>AIzaSyAFxKYI_ViLFAxjk2b1EcCn2B9ctYvn6-E</string>
+	<key>FirebaseProjectId</key>
+	<string>lemekeru</string>
+	<key>FirebaseStorageBucket</key>
+	<string>lemekeru-content-station</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

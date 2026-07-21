@@ -2,13 +2,17 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { submitReview, mediaUrl, type DraftDetail } from "@/lib/api";
+import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { CAPTURES, firestore } from "@/lib/firebase";
+import { useStorageUrl } from "@/lib/useStorageUrl";
+import type { Capture } from "@/lib/types";
 
 const PLATFORMS = ["instagram", "tiktok", "facebook"] as const;
 
-export default function ReviewClient({ draft }: { draft: DraftDetail }) {
+export default function ReviewClient({ capture }: { capture: Capture }) {
   const router = useRouter();
-  const plan = draft.plan;
+  const plan = capture.plan;
+  const videoUrl = useStorageUrl(capture.brandedStoragePath ?? capture.storagePath);
 
   const [hook, setHook] = useState(plan?.selectedHook ?? "");
   const [caption, setCaption] = useState(plan?.captions.instagram ?? "");
@@ -20,19 +24,29 @@ export default function ReviewClient({ draft }: { draft: DraftDetail }) {
   const togglePlatform = (p: string) =>
     setPlatforms((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
 
+  /// Approving does not publish — it asks. The Mac worker picks up
+  /// `approve_requested` and is the only party holding the Postiz key.
   const submit = async (action: "approve" | "reject") => {
     setBusy(action);
     setError(null);
     try {
-      await submitReview(draft.captureId, {
-        action,
-        selectedHook: hook,
-        captions: { instagram: caption, tiktok: caption, facebook: caption },
-        cta,
-        platforms,
-      });
+      const patch =
+        action === "approve"
+          ? {
+              status: "approve_requested",
+              approvedPlatforms: platforms,
+              plan: {
+                ...plan,
+                selectedHook: hook,
+                cta,
+                captions: { instagram: caption, tiktok: caption, facebook: caption },
+              },
+              updatedAt: serverTimestamp(),
+            }
+          : { status: "rejected", updatedAt: serverTimestamp() };
+
+      await updateDoc(doc(firestore(), CAPTURES, capture.id), patch);
       router.push("/");
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "failed");
       setBusy(null);
@@ -42,12 +56,11 @@ export default function ReviewClient({ draft }: { draft: DraftDetail }) {
   return (
     <div className="space-y-6">
       <div className="overflow-hidden rounded-xl bg-black border border-zinc-800">
-        <video
-          src={mediaUrl(draft.captureId, "branded")}
-          controls
-          playsInline
-          className="mx-auto max-h-[60vh] w-auto"
-        />
+        {videoUrl ? (
+          <video src={videoUrl} controls playsInline className="mx-auto max-h-[60vh] w-auto" />
+        ) : (
+          <div className="py-16 text-center text-sm text-zinc-600">Loading video…</div>
+        )}
       </div>
 
       {plan && plan.warnings.length > 0 && (
@@ -90,9 +103,7 @@ export default function ReviewClient({ draft }: { draft: DraftDetail }) {
           rows={4}
           className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-sm text-white focus:border-sky-500 focus:outline-none"
         />
-        {plan && (
-          <div className="mt-1 text-xs text-zinc-500">{plan.hashtags.join(" ")}</div>
-        )}
+        {plan && <div className="mt-1 text-xs text-zinc-500">{plan.hashtags.join(" ")}</div>}
       </div>
 
       <div>
@@ -142,7 +153,7 @@ export default function ReviewClient({ draft }: { draft: DraftDetail }) {
           disabled={busy !== null || platforms.length === 0}
           className="flex-[2] rounded-xl bg-sky-600 py-3 font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
         >
-          {busy === "approve" ? "Approving…" : "Approve to Postiz"}
+          {busy === "approve" ? "Sending…" : "Approve to Postiz"}
         </button>
       </div>
     </div>

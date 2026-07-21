@@ -6,7 +6,7 @@ import SwiftUI
 struct StationView: View {
     @EnvironmentObject var camera: CameraController
     @EnvironmentObject var uploader: UploadQueue
-    @EnvironmentObject var config: StationConfig
+    @EnvironmentObject var station: StationConfig
 
     @State private var showSetup = false
 
@@ -23,7 +23,8 @@ struct StationView: View {
         }
         .task {
             await camera.configure()
-            if !config.isConfigured { showSetup = true }
+            await station.registerAndRefresh()
+            if !station.approved { showSetup = true }
         }
         .sheet(isPresented: $showSetup) {
             SetupSheet()
@@ -163,8 +164,8 @@ struct StationView: View {
             Button {
                 showSetup = true
             } label: {
-                Label(config.isConfigured ? "Linked" : "Set up", systemImage: config.isConfigured ? "link" : "exclamationmark.triangle")
-                    .foregroundStyle(config.isConfigured ? .green : .yellow)
+                Label(station.approved ? "Paired" : "Pair", systemImage: station.approved ? "link" : "exclamationmark.triangle")
+                    .foregroundStyle(station.approved ? .green : .yellow)
             }
             Text("Uploads: \(uploader.pendingCount)")
                 .foregroundStyle(.white.opacity(0.8))

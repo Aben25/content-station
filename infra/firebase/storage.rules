@@ -1,0 +1,45 @@
+rules_version = '2';
+
+// Bucket: lemekeru-content-station
+//
+// Approval is carried in the station's auth token as a custom claim rather
+// than read from Firestore: cross-service rule lookups were denied on this
+// bucket even with the storage service agent granted the Firestore rules role,
+// and a claim costs nothing per request. The Mac worker mints the claim when
+// the owner pairs a station (see syncStationClaims in apps/backend/src/worker.ts).
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function ownerEmails() {
+      return ['abenuro@gmail.com'];
+    }
+
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email in ownerEmails();
+    }
+
+    function isApprovedStation() {
+      return request.auth != null && request.auth.token.stationApproved == true;
+    }
+
+    match /captures/{captureId}/raw.mp4 {
+      allow read: if isOwner();
+      // 500 MB matches the old Fastify limit — ~30s of 1080p with headroom.
+      allow write: if isApprovedStation()
+        && request.resource.size < 500 * 1024 * 1024
+        && request.resource.contentType.matches('video/.*');
+    }
+
+    // Rendered output and thumbnails are written by the worker only.
+    match /captures/{captureId}/{file} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

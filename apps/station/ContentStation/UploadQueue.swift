@@ -15,25 +15,26 @@ struct UploadItem: Identifiable, Equatable {
     var filename: String { fileURL.lastPathComponent }
 }
 
-/// Uploads saved captures to the backend and deletes the local copy only
-/// after the server confirms. Survives relaunch: pending files are re-scanned
-/// from disk on init, so recordings are never silently lost.
+/// Uploads saved captures to Cloud Storage and records them in Firestore,
+/// deleting the local copy only once both have succeeded. Survives relaunch:
+/// pending files are re-scanned from disk on init, so recordings are never
+/// silently lost.
+///
+/// Nothing here needs a route into the Mac. The station pushes to Firebase and
+/// the worker pulls from it, which is why the tunnel and the fixed hostname are
+/// gone.
 @MainActor
 final class UploadQueue: ObservableObject {
     @Published private(set) var items: [UploadItem] = []
 
-    /// Backend URL + station token, entered once on the device. Captures still
-    /// record and queue on disk while unconfigured; they upload once it is set.
-    private let config: StationConfig
-
+    private let station: StationConfig
     private var isProcessing = false
 
     // Default argument is resolved in the initialiser body, not at the call
     // site, so the main-actor `shared` is only touched from the main actor.
-    init(config: StationConfig? = nil) {
-        self.config = config ?? .shared
+    init(station: StationConfig? = nil) {
+        self.station = station ?? .shared
         rescanFromDisk()
-        pingBackend()
         NotificationCenter.default.addObserver(
             forName: .captureSaved,
             object: nil,
@@ -44,24 +45,6 @@ final class UploadQueue: ObservableObject {
                 self?.enqueue(url)
             }
         }
-    }
-
-    /// Let the backend know the station is alive (dashboard "online" status).
-    private func pingBackend() {
-        guard let request = authorizedRequest(path: "station/ping", method: "POST") else { return }
-        Task.detached {
-            _ = try? await URLSession.shared.data(for: request)
-        }
-    }
-
-    /// Builds a request against the configured backend with the station token
-    /// attached. Returns nil when the station has not been set up yet.
-    private func authorizedRequest(path: String, method: String) -> URLRequest? {
-        guard let baseURL = config.baseURL, let token = config.token else { return nil }
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
-        request.httpMethod = method
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        return request
     }
 
     /// Free disk space for the station health screen (bytes).
@@ -101,6 +84,11 @@ final class UploadQueue: ObservableObject {
     private func process() {
         guard !isProcessing,
               let idx = items.firstIndex(where: { $0.status == .pending }) else { return }
+
+        // Unpaired stations keep recording and keep the footage; uploads resume
+        // once the owner approves this station.
+        guard station.approved else { return }
+
         isProcessing = true
         let item = items[idx]
         items[idx].status = .uploading(0)
@@ -113,7 +101,7 @@ final class UploadQueue: ObservableObject {
                     }
                 }
                 setStatus(itemID: item.id, status: .uploaded(captureId: captureId))
-                // Server confirmed — safe to remove the local file.
+                // Firebase confirmed both writes — safe to remove the local file.
                 CaptureStore.delete(item.fileURL)
             } catch {
                 setStatus(itemID: item.id, status: .failed(error.localizedDescription))
@@ -128,51 +116,45 @@ final class UploadQueue: ObservableObject {
         items[idx].status = status
     }
 
-    // MARK: - Network
+    // MARK: - Firebase
 
-    private struct UploadResponse: Decodable {
-        let captureId: String
-    }
-
+    /// Storage object first, Firestore document second. That order matters: the
+    /// worker claims on the document, so a document only ever appears once its
+    /// footage is fully uploaded.
     private func upload(_ fileURL: URL,
                         progress: @escaping (Double) -> Void) async throws -> String {
-        guard var request = authorizedRequest(path: "upload", method: "POST") else {
-            throw NSError(domain: "UploadQueue", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: "Station not set up — add the backend URL and token in Setup",
-            ])
+        let captureId = UUID().uuidString.lowercased()
+        let storagePath = "captures/\(captureId)/raw.mp4"
+        let token = try await station.idToken()
+        guard let uid = station.uid else {
+            throw FirebaseREST.FirebaseError.malformedResponse
         }
 
-        let boundary = "Boundary-\(UUID().uuidString)"
-        request.setValue("multipart/form-data; boundary=\(boundary)",
-                         forHTTPHeaderField: "Content-Type")
+        progress(0.1)
+        try await FirebaseREST.upload(
+            config: station.config,
+            idToken: token,
+            objectPath: storagePath,
+            fileURL: fileURL
+        )
 
-        let fileData = try Data(contentsOf: fileURL)
-        var body = Data()
-        body.append("--\(boundary)\r\n")
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileURL.lastPathComponent)\"\r\n")
-        body.append("Content-Type: video/mp4\r\n\r\n")
-        body.append(fileData)
-        body.append("\r\n--\(boundary)--\r\n")
-        request.httpBody = body
-
-        progress(0.3)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        progress(0.8)
+        let bytes = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int) ?? 0
+        try await FirebaseREST.createDocument(
+            config: station.config,
+            idToken: token,
+            collection: "csCaptures",
+            documentId: captureId,
+            fields: [
+                "stationId": uid,
+                "status": "uploaded",
+                "storagePath": storagePath,
+                "bytes": bytes ?? 0,
+                "createdAt": Date(),
+                "updatedAt": Date(),
+            ]
+        )
         progress(1.0)
-
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
-            let message = (code == 401 || code == 403)
-                ? "Station token rejected — re-run Setup"
-                : "Server returned \(code)"
-            throw NSError(domain: "UploadQueue", code: code,
-                          userInfo: [NSLocalizedDescriptionKey: message])
-        }
-        return try JSONDecoder().decode(UploadResponse.self, from: data).captureId
-    }
-}
-
-private extension Data {
-    mutating func append(_ string: String) {
-        append(string.data(using: .utf8)!)
+        return captureId
     }
 }

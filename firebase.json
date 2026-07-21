@@ -1,0 +1,12 @@
+{
+  "firestore": {
+    "rules": "infra/firebase/firestore.rules",
+    "indexes": "infra/firebase/firestore.indexes.json"
+  },
+  "storage": [
+    {
+      "bucket": "lemekeru-content-station",
+      "rules": "infra/firebase/storage.rules"
+    }
+  ]
+}

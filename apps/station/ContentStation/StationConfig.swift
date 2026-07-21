@@ -1,53 +1,151 @@
 import Foundation
 
-/// Where this station uploads to, and the token that authorises it.
+/// The station's Firebase identity and pairing state.
 ///
-/// Held in UserDefaults rather than baked into the build so the repo carries no
-/// secret and a TestFlight build can be pointed at any backend. Staff enter it
-/// once via the setup sheet; the pairing flow (6-char code) replaces the manual
-/// entry later without changing anything downstream of `baseURL`/`token`.
+/// On first launch the app signs in anonymously and writes
+/// `csStations/{uid}` with `approved: false` and a 6-character pairing code.
+/// It stays inert until the owner types that code into the dashboard, which
+/// flips `approved` to true. That handshake replaces the old arrangement where
+/// the app had to be shipped with a backend URL and a shared token baked in.
 @MainActor
 final class StationConfig: ObservableObject {
     private enum Key {
-        static let baseURL = "station.baseURL"
-        static let token = "station.token"
+        static let refreshToken = "station.firebase.refreshToken"
+        static let uid = "station.firebase.uid"
+        static let pairingCode = "station.pairingCode"
     }
 
-    @Published private(set) var baseURL: URL?
-    @Published private(set) var token: String?
+    @Published private(set) var uid: String?
+    @Published private(set) var pairingCode: String?
+    @Published private(set) var approved = false
+    @Published private(set) var lastError: String?
+
+    let config = FirebaseREST.Config.fromBundle()
+
+    private var session: FirebaseREST.Session?
 
     static let shared = StationConfig()
 
     init() {
         let defaults = UserDefaults.standard
-        if let stored = defaults.string(forKey: Key.baseURL) {
-            baseURL = URL(string: stored)
+        uid = defaults.string(forKey: Key.uid)
+        pairingCode = defaults.string(forKey: Key.pairingCode)
+    }
+
+    var isRegistered: Bool { uid != nil }
+
+    /// Ambiguous characters are left out so staff reading a code off the screen
+    /// and an owner typing it into the dashboard agree on what they saw.
+    private static func makePairingCode() -> String {
+        let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+        return String((0..<6).map { _ in alphabet.randomElement()! })
+    }
+
+    /// A valid ID token, refreshing or signing in as needed.
+    ///
+    /// `force` is used right after pairing: approval is carried as a custom
+    /// claim, and claims only appear in a freshly minted token.
+    func idToken(force: Bool = false) async throws -> String {
+        if !force, let session, session.expiresAt > Date() {
+            return session.idToken
         }
-        token = defaults.string(forKey: Key.token)
+        if let refreshToken = UserDefaults.standard.string(forKey: Key.refreshToken) {
+            let refreshed = try await FirebaseREST.refresh(config: config, refreshToken: refreshToken)
+            store(refreshed)
+            return refreshed.idToken
+        }
+        let fresh = try await FirebaseREST.signInAnonymously(config: config)
+        store(fresh)
+        return fresh.idToken
     }
 
-    var isConfigured: Bool { baseURL != nil && !(token ?? "").isEmpty }
-
-    /// Returns nil when the input is unusable, so the setup sheet can complain.
-    @discardableResult
-    func save(urlString: String, token newToken: String) -> Bool {
-        let trimmedURL = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedToken = newToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmedURL),
-              url.scheme == "https" || url.host == "localhost" || url.host == "127.0.0.1",
-              !trimmedToken.isEmpty else { return false }
-
-        UserDefaults.standard.set(url.absoluteString, forKey: Key.baseURL)
-        UserDefaults.standard.set(trimmedToken, forKey: Key.token)
-        baseURL = url
-        token = trimmedToken
-        return true
+    private func store(_ session: FirebaseREST.Session) {
+        self.session = session
+        UserDefaults.standard.set(session.refreshToken, forKey: Key.refreshToken)
+        UserDefaults.standard.set(session.localId, forKey: Key.uid)
+        uid = session.localId
     }
 
-    func clear() {
-        UserDefaults.standard.removeObject(forKey: Key.baseURL)
-        UserDefaults.standard.removeObject(forKey: Key.token)
-        baseURL = nil
-        token = nil
+    /// Sign in, create the station document if this device has never registered,
+    /// and report whether the owner has approved it.
+    func registerAndRefresh(name: String = "Station") async {
+        do {
+            let token = try await idToken()
+            guard let uid else { return }
+
+            let existing = try await FirebaseREST.getDocument(
+                config: config, idToken: token, collection: "csStations", documentId: uid
+            )
+
+            if let existing {
+                approved = boolField(existing["approved"]) ?? false
+                // The document says approved but this token predates the claim
+                // the worker minted — refresh so uploads are actually allowed.
+                if approved, !tokenHasApprovalClaim() {
+                    _ = try? await idToken(force: true)
+                }
+                if let code = stringField(existing["pairingCode"]) {
+                    pairingCode = code
+                    UserDefaults.standard.set(code, forKey: Key.pairingCode)
+                }
+                // Liveness for the dashboard's station card.
+                try? await FirebaseREST.patchDocument(
+                    config: config, idToken: token, collection: "csStations", documentId: uid,
+                    fields: ["lastSeenAt": Date(), "appVersion": Self.appVersion]
+                )
+            } else {
+                let code = pairingCode ?? Self.makePairingCode()
+                try await FirebaseREST.createDocument(
+                    config: config, idToken: token, collection: "csStations", documentId: uid,
+                    fields: [
+                        "approved": false,
+                        "pairingCode": code,
+                        "name": name,
+                        "appVersion": Self.appVersion,
+                        "createdAt": Date(),
+                        "lastSeenAt": Date(),
+                    ]
+                )
+                pairingCode = code
+                UserDefaults.standard.set(code, forKey: Key.pairingCode)
+                approved = false
+            }
+            lastError = nil
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    static var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+    }
+
+    /// Reads `stationApproved` out of the current ID token without verifying
+    /// it — the server is what enforces the claim; this only decides whether a
+    /// refresh is worth doing.
+    private func tokenHasApprovalClaim() -> Bool {
+        guard let token = session?.idToken else { return false }
+        let parts = token.split(separator: ".")
+        guard parts.count == 3 else { return false }
+
+        var base64 = String(parts[1])
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        while base64.count % 4 != 0 { base64 += "=" }
+
+        guard let data = Data(base64Encoded: base64),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+        return json["stationApproved"] as? Bool == true
+    }
+
+    // Firestore REST returns typed values — unwrap the two shapes used here.
+    private func stringField(_ value: Any?) -> String? {
+        (value as? [String: Any])?["stringValue"] as? String
+    }
+
+    private func boolField(_ value: Any?) -> Bool? {
+        (value as? [String: Any])?["booleanValue"] as? Bool
     }
 }

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { homedir, hostname } from "node:os";
 import { fileURLToPath } from "node:url";
 
 // apps/backend/src/config.ts → repo root → tools/. Resolved from this file so
@@ -27,6 +28,20 @@ export const config = {
   auth: {
     stationToken: process.env.STATION_TOKEN ?? "",
     ownerToken: process.env.OWNER_TOKEN ?? "",
+  },
+
+  // The Mac worker pulls jobs from Firestore instead of accepting inbound
+  // uploads, so the station never needs a route into this machine.
+  firebase: {
+    projectId: process.env.FIREBASE_PROJECT_ID ?? "lemekeru",
+    bucket: process.env.FIREBASE_STORAGE_BUCKET ?? "lemekeru-content-station",
+    serviceAccountPath:
+      process.env.FIREBASE_SERVICE_ACCOUNT ??
+      path.join(homedir(), ".config/content-station/worker-sa.json"),
+    pollIntervalMs: Number(process.env.WORKER_POLL_MS ?? 5000),
+    workerId: process.env.WORKER_ID ?? `${hostname()}-${process.pid}`,
+    // A claim older than this is treated as a dead worker and retried.
+    claimTimeoutMs: Number(process.env.WORKER_CLAIM_TIMEOUT_MS ?? 15 * 60 * 1000),
   },
 
   // Hermes content plan generation. Uses an OpenAI-compatible endpoint.

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.contentstation.worker</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/benforjesubenforjesuss/.hermes/node/bin/node</string>
+		<string>/Users/benforjesubenforjesuss/Projects/content-station/apps/backend/node_modules/tsx/dist/cli.mjs</string>
+		<string>src/worker.ts</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>/Users/benforjesubenforjesuss/Projects/content-station/apps/backend</string>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>/Users/benforjesubenforjesuss/Projects/content-station/logs/worker.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/benforjesubenforjesuss/Projects/content-station/logs/worker.err.log</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>/Users/benforjesubenforjesuss/.hermes/node/bin:/usr/local/bin:/usr/bin:/bin:/Users/benforjesubenforjesuss/Library/Python/3.9/bin</string>
+	</dict>
+</dict>
+</plist>

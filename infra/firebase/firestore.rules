@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// Content Station shares the `lemekeru` project with the Sutway app, so every
+// collection here is prefixed `cs`. Rules below deny anything not named.
+//
+// Three principals:
+//   owner   — signs in with email/password, listed in OWNER_EMAILS below
+//   station — the mounted iPhone, signed in anonymously, must be approved
+//   worker  — the Mac, uses the Admin SDK and bypasses these rules entirely
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function ownerEmails() {
+      return ['abenuro@gmail.com'];
+    }
+
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email in ownerEmails();
+    }
+
+    // Approval rides in the token as a custom claim, minted by the worker when
+    // the owner pairs a station. Same signal the Storage rules use, and it
+    // costs no document read per capture.
+    function stationApproved() {
+      return request.auth != null && request.auth.token.stationApproved == true;
+    }
+
+    // A station self-registers on first launch with approved:false and a
+    // pairing code. It stays inert until the owner approves it from the
+    // dashboard — that approval is the pairing flow.
+    match /csStations/{stationId} {
+      allow read: if isOwner() || request.auth.uid == stationId;
+      allow create: if request.auth.uid == stationId
+        && request.resource.data.approved == false
+        && request.resource.data.pairingCode is string
+        && request.resource.data.pairingCode.size() == 6;
+      // A station may report liveness but must never approve itself.
+      allow update: if isOwner()
+        || (request.auth.uid == stationId
+            && request.resource.data.approved == resource.data.approved
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['lastSeenAt', 'appVersion', 'name']));
+      allow delete: if isOwner();
+    }
+
+    // Captures are created by the station at upload time and driven forward by
+    // the worker. The owner edits captions and requests publication; the worker
+    // is what actually talks to Postiz, so the Postiz key never leaves the Mac.
+    match /csCaptures/{captureId} {
+      allow read: if isOwner() || request.auth.uid == resource.data.stationId;
+      allow create: if stationApproved()
+        && request.resource.data.stationId == request.auth.uid
+        && request.resource.data.status == 'uploaded'
+        && request.resource.data.storagePath is string;
+      allow update: if isOwner()
+        && request.resource.data.stationId == resource.data.stationId
+        && request.resource.data.status in ['approve_requested', 'rejected', 'needs_review'];
+      allow delete: if isOwner();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
