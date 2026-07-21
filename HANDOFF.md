@@ -9,12 +9,15 @@
 
 ## What this thing is
 
-Content Station turns a mounted iPhone into a social-content camera. A staff member taps **Capture Moment** on the station app, the backend processes the video, generates branded content via Hermes AI, and creates a Postiz draft. The owner reviews from a Next.js dashboard and approves.
+Content Station turns a mounted iPhone into a social-content camera. A staff member taps **Capture Moment** on the station app, the footage goes to Firebase, a Mac worker transcribes and renders it into a branded 9:16 clip with AI-written copy, and the owner reviews and approves from a Next.js dashboard, which publishes through Postiz.
 
 ```
-iPhone (SwiftUI/AVFoundation) → Backend (Fastify + whisper + Hermes) → Postiz → TikTok/IG/FB
-                        ↘ Owner Dashboard (Next.js) /
+iPhone ──▶ Cloud Storage + Firestore ◀── Mac worker (whisper + ffmpeg + Hermes + Postiz)
+                     ▲
+                     └── Owner dashboard (Next.js + Firebase Auth)
 ```
+
+The Mac only ever connects outbound. See **Firebase (current architecture)** below.
 
 Parts are all in this repo:
 - `apps/station/` — mounted iPhone app (SwiftUI)
@@ -30,13 +33,23 @@ Parts are all in this repo:
 ## Current working state (as of this handoff)
 
 ### ✅ Working end-to-end
-- SwiftUI station app builds and installs on iPhone (`xcrun devicectl device install app`)
-- Backend: upload endpoint → ffmpeg probe → whisper.cpp transcription → Hermes content plan → branded 9:16 render
-- Real Postiz cloud API integration; `POST /drafts/:id/review` with `approve` creates a **live Postiz draft**
+- SwiftUI station app builds; pairs over Firebase with a six-character code
+- Worker: Storage download → ffmpeg probe → whisper.cpp transcription → content plan → branded 9:16 render → back to Storage
+- Real Postiz cloud API integration, driven by the worker on `approve_requested`
 - Rally brand profile wired into `.env` (prohibited-claims guard active)
-- Hermes proxy wired to Nous Portal (no API keys hardcoded elsewhere)
-- **Token auth on every route except `/health`** (see Auth below)
-- Verified end to end after the auth change: station-token upload → transcript → plan → `branded.mp4` → `needs_review`
+- Firebase Auth on the dashboard; security rules verified by `rules-check.mts` (10/10)
+- Verified end to end: Storage upload → worker → transcript → `branded.mp4` → `needs_review`, and reject → all objects purged
+
+### ⚠️ Known broken
+- **The LLM is not running.** Nous Portal returns "requires available credits", so `generateContentPlan` silently falls back to canned copy. Captions and hooks are templates, not AI, until the account is topped up or `CONTENT_LLM_MODEL` points at a free model
+- **No owner account exists.** Nobody can sign in to the dashboard until one is created (see roadmap item 5)
+
+### ✅ Completed in the Firebase session
+- Front door moved to Firebase: station uploads to Cloud Storage, worker polls Firestore. **The Cloudflare tunnel, cert.pem and fixed hostname are no longer needed at all**
+- Pairing flow shipped (six-character code, owner approves in the dashboard)
+- Dashboard rebuilt on Firebase Auth + Firestore realtime; the old Fastify proxy layer is gone
+- Approval carried as a custom auth claim, minted by the worker
+- Rejected captures purge their Storage objects and local scratch
 
 ### ✅ Completed in the auth/pipeline session
 - Two-token auth: `STATION_TOKEN` (upload + ping only) and `OWNER_TOKEN` (everything). Backend refuses to start without both
@@ -50,13 +63,7 @@ Parts are all in this repo:
 - IPA (0.1.0 build 1) uploaded to App Store Connect. That build predates the auth work — it points at the dead tunnel and has no setup sheet, so it needs a rebuild before it is useful
 
 ### 🔜 Not yet built
-- Named Cloudflare tunnel (stable domain + launch service) — cert.pem was never written; `~/.cloudflared/` is empty
-- launchd services not loaded — `infra/*.plist` exist but nothing survives a reboot yet
-- Station pairing flow (6-char code → API URL + station token, replacing manual entry in the setup sheet)
-- Dashboard auth (Supabase). The dashboard itself is unauthenticated, so **do not expose port 3001 publicly** — keep it on localhost/LAN
-- Pipeline failures are invisible: a capture that errors shows nothing to staff and nothing to the owner
-- Per-workspace brand profile + Postiz keys (multi-tenancy)
-- Instagram/Facebook integrations in Postiz (only TikTok is configured now)
+See **What to build next** below — the list is now short.
 
 ---
 
