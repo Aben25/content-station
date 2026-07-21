@@ -26,8 +26,6 @@
 	<dict>
 		<key>PATH</key>
 		<string>/Users/benforjesubenforjesuss/.hermes/node/bin:/usr/local/bin:/usr/bin:/bin</string>
-		<key>NEXT_PUBLIC_API_BASE</key>
-		<string>http://10.0.0.230:3000</string>
 	</dict>
 </dict>
 </plist>
