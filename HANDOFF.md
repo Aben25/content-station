@@ -82,11 +82,18 @@ npx tsx watch src/index.ts
 # Health:  curl http://localhost:3000/health
 ```
 
-### Terminal 3 — Dashboard
+### Terminal 3 — Mac worker (the important one)
+```bash
+cd ~/Projects/content-station/apps/backend
+npx tsx src/worker.ts
+# polls Firestore for captures; logs to logs/worker.log
+```
+
+### Terminal 4 — Dashboard
 ```bash
 cd ~/Projects/content-station/apps/dashboard
 npm install                 # if needed
-cp .env.example .env.local  # set BACKEND_URL + OWNER_TOKEN (same value as the backend's)
+cp .env.example .env.local  # Firebase web config (public values)
 npx next dev -p 3001
 # → http://localhost:3001
 ```
@@ -101,10 +108,9 @@ curl -L -o tools/models/ggml-base.en.bin \
 ```
 
 ### iPhone — station app
-On first launch the app shows **Station Setup**: enter the backend URL (https,
-or localhost on the LAN) and the `STATION_TOKEN`. It is stored in UserDefaults
-and reachable afterwards from the footer button. Captures still record and queue
-on disk while unconfigured — they upload once a token is set.
+On first launch the app shows a six-character pairing code. Type it into the
+dashboard to approve the station. Captures still record and queue on disk while
+unpaired — they upload once approved. Nothing else to configure.
 
 ```bash
 cd ~/Projects/content-station/apps/station
@@ -164,7 +170,71 @@ The project reuses the locally-running Hermes proxy. If you want a non-Hermes fa
 
 ---
 
-## Auth
+## Firebase (current architecture)
+
+Project **`lemekeru`** (display name "Sutway" — reused because the Google
+account is at its project-creation quota). Content Station namespaces
+everything inside it: collections prefixed `cs`, media in its own bucket.
+
+```
+iPhone ──upload──▶ Cloud Storage ──┐
+   │                                │
+   └──create doc──▶ Firestore ◀─────┴── Mac worker (polls, outbound only)
+                        ▲                    │
+                        └── dashboard ───────┘ whisper + ffmpeg + Postiz
+```
+
+The Mac makes only outbound connections. No tunnel, no certificate, no fixed
+hostname, nothing to reconfigure when the network changes.
+
+| Piece | Value |
+|---|---|
+| Firestore collections | `csCaptures`, `csStations` |
+| Storage bucket | `lemekeru-content-station` |
+| Worker service account key | `~/.config/content-station/worker-sa.json` (**not** in git) |
+| Web app ID | `1:233122534259:web:4ccb4e0c154e54c62beb06` |
+| Rules | `infra/firebase/*.rules` — deploy with `firebase deploy --only firestore:rules,storage` |
+
+### Capture lifecycle
+
+`uploaded` → `processing` → `needs_review` → `approve_requested` →
+`publishing` → `approved`. Failures park in `error` or `publish_failed` with
+the reason attached. `rejected` → worker deletes all files → `deleted`.
+
+The dashboard can only write `approve_requested` and `rejected`. The worker is
+the only party that calls Postiz, so the Postiz key never leaves this Mac.
+
+### Pairing
+
+The app signs in anonymously and writes `csStations/{uid}` with
+`approved: false` and a six-character code. The owner types that code into the
+dashboard. The worker sees the approval and mints a `stationApproved` custom
+claim; the app refreshes its token and uploads start flowing. Nothing is baked
+into the build.
+
+**Approval is a custom claim, not a Firestore lookup.** Storage rules could not
+read Firestore on this bucket even after granting the storage service agent
+`roles/firebaserules.firestoreServiceAgent`. If you switch back to a
+cross-service rule, `rules-check.mts` will catch it.
+
+### Testing the rules
+
+```bash
+cd apps/backend && npx tsx rules-check.mts
+```
+
+Signs in anonymously and performs the writes the app performs. Ten checks; it
+cleans up after itself. Run it after any rules change.
+
+---
+
+## Legacy HTTP path (being retired)
+
+`apps/backend/src/index.ts` is the old Fastify server with `STATION_TOKEN` /
+`OWNER_TOKEN` auth and the JSON-file store. Nothing uses it any more — the app
+uploads to Firebase and the dashboard reads Firestore. It is kept only so an
+older TestFlight build still has somewhere to talk to. Delete it once the
+Firebase build ships.
 
 Every route except `GET /health` requires a token, sent as
 `Authorization: Bearer <token>` (or `X-Station-Token`). Enforced by an
@@ -258,22 +328,25 @@ Backend only holds Postiz credentials. The iPhone app must never.
 
 Goal for the next stretch: one real business runs this for a week unattended.
 
-**P0 — before any pilot**
+**Blocking the pilot**
 1. ~~Restore whisper + auth~~ — done
-2. **Named Cloudflare tunnel** on a real domain + DNS route. Expose the backend only, never the dashboard
-3. **launchd services** — load `infra/*.plist` so backend, dashboard and tunnel survive a reboot
-4. **Rebuild the TestFlight build** — the uploaded 0.1.0(1) predates auth and the setup sheet
+2. ~~Cloudflare tunnel~~ — **deleted as a requirement** by the Firebase move
+3. ~~Pairing flow~~ — done (six-character code)
+4. ~~Dashboard auth~~ — done (Firebase Auth, email allowlist in rules)
+5. **Create the owner account** — Firebase Console → Authentication → Add user, with an email listed in `ownerEmails()` in both rules files. Nobody can sign in to the dashboard until this exists
+6. **Top up the LLM account** — Nous Portal reports insufficient credits, so every content plan is falling back to canned copy. The AI in this product is not currently running
+7. **launchd for the worker** — `infra/com.contentstation.worker.plist`; nothing survives a reboot yet
+8. **Rebuild for TestFlight** — the uploaded 0.1.0(1) predates all of this
 
-**P1 — survivable unattended**
-5. **Pairing flow** — staff enters a 6-char code, backend issues the station token and URL
-6. **Failure visibility** — surface `status: "error"` captures to the owner; today they fail silently
-7. **Confirm retention actually sweeps** — `housekeeping.ts` exists; verify `RAW_RETENTION_DAYS` is enforced
+**Survivable unattended**
+9. **Failure visibility** — `error` and `publish_failed` show in the dashboard, but nothing pushes to the owner's phone. FCM is the obvious next step
+10. **Local scratch retention** — `housekeeping.ts` sweeps the old JSON store, not the worker's scratch dirs. Rejected captures are cleaned; approved ones are not
+11. **A second worker** — claims are transactional and stale claims are reclaimed after 15 minutes, but this has only ever run with one worker
 
-**P2 — second customer**
-8. **Dashboard auth** — Supabase Auth
-9. **Workspace model** — separate brand profiles + Postiz accounts per business; replaces the single `.env`
-10. **Postgres** in place of the JSON-file store
-11. **Postiz Instagram/Facebook** — add IDs to `.env`, extend `postiz.ts`
+**Second customer**
+12. **Workspace model** — brand profile and Postiz keys per business; today both come from one `.env` on this Mac
+13. **Owner allowlist in Firestore** rather than hardcoded in the rules files
+14. **Postiz Instagram/Facebook** — add IDs to `.env`, extend `postiz.ts`
 
 ---
 
