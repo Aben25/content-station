@@ -17,3 +17,7 @@ tools/models/ggml-base.en.bin
 
 # Runtime logs
 logs/
+
+# Build artifacts
+apps/station/build/
+tools/models/ggml-base.bin

@@ -29,6 +29,19 @@ final class UploadQueue: ObservableObject {
 
     private let station: StationConfig
     private var isProcessing = false
+    private var retryTask: Task<Void, Never>?
+
+    /// Consecutive failures, used to back off. Nothing is ever dropped: the
+    /// file stays on disk and the queue keeps trying, because a station on a
+    /// slow or intermittent link should be patient rather than lossy.
+    private var failureStreak = 0
+
+    /// 5s, 15s, 45s, 2m, 5m, then every 15 minutes.
+    private var retryDelay: Duration {
+        let ladder: [Int] = [5, 15, 45, 120, 300]
+        let seconds = failureStreak <= ladder.count ? ladder[max(0, failureStreak - 1)] : 900
+        return .seconds(seconds)
+    }
 
     // Default argument is resolved in the initialiser body, not at the call
     // site, so the main-actor `shared` is only touched from the main actor.
@@ -72,6 +85,19 @@ final class UploadQueue: ObservableObject {
     func retry(_ item: UploadItem) {
         guard let idx = items.firstIndex(where: { $0.id == item.id }) else { return }
         items[idx].status = .pending
+        failureStreak = 0
+        process()
+    }
+
+    /// Retry everything now. Called when the station is approved, when the app
+    /// returns to the foreground, and on the idle heartbeat — any of which may
+    /// mean the thing that was blocking uploads has gone away.
+    func kick() {
+        guard station.approved else { return }
+        for idx in items.indices {
+            if case .failed = items[idx].status { items[idx].status = .pending }
+        }
+        rescanFromDisk()
         process()
     }
 
@@ -86,7 +112,7 @@ final class UploadQueue: ObservableObject {
               let idx = items.firstIndex(where: { $0.status == .pending }) else { return }
 
         // Unpaired stations keep recording and keep the footage; uploads resume
-        // once the owner approves this station.
+        // once the owner approves this station and `kick()` is called.
         guard station.approved else { return }
 
         isProcessing = true
@@ -103,11 +129,32 @@ final class UploadQueue: ObservableObject {
                 setStatus(itemID: item.id, status: .uploaded(captureId: captureId))
                 // Firebase confirmed both writes — safe to remove the local file.
                 CaptureStore.delete(item.fileURL)
+                failureStreak = 0
+                isProcessing = false
+                process() // next item
             } catch {
                 setStatus(itemID: item.id, status: .failed(error.localizedDescription))
+                failureStreak += 1
+                isProcessing = false
+                scheduleRetry(itemID: item.id)
             }
-            isProcessing = false
-            process() // next item
+        }
+    }
+
+    /// Put a failed item back in line after a delay. Unattended stations get no
+    /// human to press retry, so this is the only thing standing between a
+    /// dropped connection and footage that never arrives.
+    private func scheduleRetry(itemID: UUID) {
+        retryTask?.cancel()
+        let delay = retryDelay
+        retryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled, let self else { return }
+            if let idx = self.items.firstIndex(where: { $0.id == itemID }),
+               case .failed = self.items[idx].status {
+                self.items[idx].status = .pending
+            }
+            self.process()
         }
     }
 

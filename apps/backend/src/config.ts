@@ -22,8 +22,13 @@ export const config = {
   ffmpeg: process.env.FFMPEG_PATH ?? path.join(TOOLS, "bin/ffmpeg"),
   ffprobe: process.env.FFPROBE_PATH ?? path.join(TOOLS, "bin/ffprobe"),
   whisperCli: process.env.WHISPER_CLI ?? path.join(TOOLS, "whisper/whisper-cli"),
+  // Multilingual model by default — the .en model transcribes non-English
+  // speech as nonsense rather than failing, which is worse than no transcript.
+  // `auto` lets whisper detect; set WHISPER_LANGUAGE=am (Amharic), en, etc. to
+  // pin it when the station's language is known.
   whisperModel:
-    process.env.WHISPER_MODEL ?? path.join(TOOLS, "models/ggml-base.en.bin"),
+    process.env.WHISPER_MODEL ?? path.join(TOOLS, "models/ggml-base.bin"),
+  whisperLanguage: process.env.WHISPER_LANGUAGE ?? "auto",
 
   auth: {
     stationToken: process.env.STATION_TOKEN ?? "",

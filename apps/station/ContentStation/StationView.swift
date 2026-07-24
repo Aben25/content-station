@@ -7,6 +7,7 @@ struct StationView: View {
     @EnvironmentObject var camera: CameraController
     @EnvironmentObject var uploader: UploadQueue
     @EnvironmentObject var station: StationConfig
+    @EnvironmentObject var kiosk: KioskMode
 
     @State private var showSetup = false
 
@@ -21,10 +22,20 @@ struct StationView: View {
                 stationView
             }
         }
+        // Dimming protects the panel over months of always-on use; any touch
+        // brings it straight back.
+        .opacity(kiosk.isDimmed ? 0.35 : 1)
+        .animation(.easeInOut(duration: 0.6), value: kiosk.isDimmed)
+        .contentShape(Rectangle())
+        .onTapGesture { kiosk.noteActivity() }
         .task {
             await camera.configure()
             await station.registerAndRefresh()
             if !station.approved { showSetup = true }
+        }
+        .onChange(of: station.approved) { _, approved in
+            // Footage recorded before pairing uploads as soon as it lands.
+            if approved { uploader.kick() }
         }
         .sheet(isPresented: $showSetup) {
             SetupSheet()
@@ -66,8 +77,12 @@ struct StationView: View {
             statusRow
                 .padding(.top, 12)
 
+            promptRow
+                .padding(.top, 8)
+                .padding(.horizontal, 24)
+
             captureButton
-                .padding(.vertical, 20)
+                .padding(.vertical, 12)
 
             footer
                 .padding(.bottom, 12)
@@ -120,8 +135,23 @@ struct StationView: View {
         .font(.subheadline.monospaced().bold())
     }
 
+    /// A fixed camera films the same thing forever unless someone is told what
+    /// to point it at. Rotates every 20 minutes.
+    @ViewBuilder
+    private var promptRow: some View {
+        if case .ready = camera.state {
+            Text(CapturePrompts.current())
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.white.opacity(0.75))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .transition(.opacity)
+        }
+    }
+
     private var captureButton: some View {
         Button {
+            kiosk.noteActivity()
             if case .recording = camera.state {
                 camera.stopRecording()
             } else {
@@ -209,5 +239,6 @@ struct StationView: View {
         .environmentObject(CameraController())
         .environmentObject(UploadQueue())
         .environmentObject(StationConfig())
+        .environmentObject(KioskMode())
         .preferredColorScheme(.dark)
 }

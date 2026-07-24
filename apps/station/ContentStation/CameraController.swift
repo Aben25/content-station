@@ -36,6 +36,53 @@ final class CameraController: NSObject, ObservableObject {
             name: UIApplication.willResignActiveNotification,
             object: nil
         )
+
+        // An unattended station has nobody to restart it. A phone call, a Siri
+        // invocation, or a media-services reset will silently stop the session
+        // and leave a frozen preview forever, so recover from all three.
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(sessionInterruptionEnded),
+                           name: .AVCaptureSessionInterruptionEnded, object: session)
+        center.addObserver(self, selector: #selector(sessionRuntimeError),
+                           name: .AVCaptureSessionRuntimeError, object: session)
+        center.addObserver(self, selector: #selector(appBecameActive),
+                           name: UIApplication.didBecomeActiveNotification, object: nil)
+    }
+
+    // MARK: - Unattended recovery
+
+    @objc private func sessionInterruptionEnded() {
+        restartIfNeeded()
+    }
+
+    @objc private func sessionRuntimeError(_ note: Notification) {
+        let err = note.userInfo?[AVCaptureSessionErrorKey] as? AVError
+        DispatchQueue.main.async { self.state = .error(err?.localizedDescription ?? "Camera error") }
+        // Media services can take a moment to come back after a reset.
+        sessionQueue.asyncAfter(deadline: .now() + 2) { [weak self] in
+            self?.restartIfNeeded()
+        }
+    }
+
+    @objc private func appBecameActive() {
+        restartIfNeeded()
+    }
+
+    /// Bring the session back up and clear any error state. Safe to call often.
+    func restartIfNeeded() {
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            if !self.session.isRunning {
+                self.session.startRunning()
+            }
+            guard self.session.isRunning else { return }
+            DispatchQueue.main.async {
+                if case .ready = self.state { return }
+                if case .recording = self.state { return }
+                if case .countdown = self.state { return }
+                self.state = .ready
+            }
+        }
     }
 
     // MARK: - Setup
@@ -67,7 +114,11 @@ final class CameraController: NSObject, ObservableObject {
         session.beginConfiguration()
         defer { session.commitConfiguration() }
 
-        session.sessionPreset = .high
+        // 720p, not the device maximum. A 15s 1080p clip is ~30 MB; at 720p it
+        // is closer to 8 MB, which matters when the station is uploading over a
+        // slow link. The render output is 1080x1920 regardless, and upscaled
+        // 720p is indistinguishable on a phone-sized feed.
+        session.sessionPreset = session.canSetSessionPreset(.hd1280x720) ? .hd1280x720 : .high
 
         guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
               let videoInput = try? AVCaptureDeviceInput(device: camera),
@@ -88,6 +139,12 @@ final class CameraController: NSObject, ObservableObject {
             return
         }
         session.addOutput(movieOutput)
+
+        // HEVC roughly halves the file again over H.264 at the same quality.
+        if let connection = movieOutput.connection(with: .video),
+           movieOutput.availableVideoCodecTypes.contains(.hevc) {
+            movieOutput.setOutputSettings([AVVideoCodecKey: AVVideoCodecType.hevc], for: connection)
+        }
 
         if let connection = movieOutput.connection(with: .video) {
             if #available(iOS 17.0, *) {

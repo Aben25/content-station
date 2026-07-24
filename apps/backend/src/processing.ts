@@ -85,6 +85,7 @@ export async function transcribe(
     await run(config.whisperCli, [
       "-m", config.whisperModel,
       "-f", wavPath,
+      "-l", config.whisperLanguage,
       "-osrt",
       "-of", outPrefix,
       "--no-prints",
