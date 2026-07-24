@@ -36,12 +36,16 @@ service cloud.firestore {
         && request.resource.data.approved == false
         && request.resource.data.pairingCode is string
         && request.resource.data.pairingCode.size() == 6;
-      // A station may report liveness but must never approve itself.
+      // A station may report liveness and device telemetry — battery, disk,
+      // queue depth, whether it is capturing — but must never approve itself.
       allow update: if isOwner()
         || (request.auth.uid == stationId
             && request.resource.data.approved == resource.data.approved
             && request.resource.data.diff(resource.data).affectedKeys()
-                 .hasOnly(['lastSeenAt', 'appVersion', 'name']));
+                 .hasOnly(['lastSeenAt', 'appVersion', 'name',
+                           'batteryPercent', 'isCharging', 'freeDiskMB',
+                           'pendingUploads', 'isCapturing', 'intervalMinutes',
+                           'blocked']));
       allow delete: if isOwner();
     }
 

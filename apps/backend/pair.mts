@@ -40,7 +40,19 @@ if (!arg) {
     const seen = d.lastSeenAt?.toDate?.();
     console.log(`  ${d.approved ? "✅ paired  " : "⏳ waiting "} code ${d.pairingCode}  ${d.name ?? ""}`);
     console.log(`     uid ${doc.id}`);
-    if (seen) console.log(`     last seen ${seen.toISOString()}`);
+    if (seen) {
+      const mins = Math.round((Date.now() - seen.getTime()) / 60000);
+      console.log(`     last seen ${mins}m ago (${seen.toISOString()})`);
+    }
+    // Device telemetry from the heartbeat — the owner's only window into a
+    // phone on another continent.
+    if (d.isCharging !== undefined) {
+      const battery = d.batteryPercent != null ? `${d.batteryPercent}%` : "?";
+      const disk = d.freeDiskMB != null ? `${(d.freeDiskMB / 1024).toFixed(1)} GB free` : "";
+      console.log(`     battery ${battery} ${d.isCharging ? "(charging)" : "(NOT CHARGING)"} · ${disk}`);
+      console.log(`     ${d.isCapturing ? `capturing every ${d.intervalMinutes}m` : "NOT capturing"} · ${d.pendingUploads ?? 0} uploads queued`);
+      if (d.blocked) console.log(`     ⚠️  ${d.blocked}`);
+    }
   }
   console.log("\nTo pair:  npx tsx pair.mts <CODE>");
   process.exit(0);

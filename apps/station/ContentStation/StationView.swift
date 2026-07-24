@@ -8,6 +8,7 @@ struct StationView: View {
     @EnvironmentObject var station: StationConfig
     @EnvironmentObject var kiosk: KioskMode
     @EnvironmentObject var scheduler: CaptureScheduler
+    @EnvironmentObject var health: DeviceHealth
 
     var body: some View {
         ZStack {
@@ -40,6 +41,14 @@ struct StationView: View {
                 .font(.headline.monospaced())
                 .foregroundStyle(.white.opacity(0.8))
                 .padding(.top, 12)
+
+            // Device trouble in words staff can act on. Blockers are why the
+            // station is not filming; warnings are things heading that way.
+            if let problem = health.current.captureBlocked {
+                healthBanner(problem, color: .red)
+            } else if let warning = health.current.warning {
+                healthBanner(warning, color: .orange)
+            }
 
             ZStack {
                 CameraPreviewView(session: camera.session)
@@ -127,6 +136,18 @@ struct StationView: View {
                     .padding(.horizontal, 20)
             }
         }
+    }
+
+    private func healthBanner(_ message: String, color: Color) -> some View {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity)
+            .background(color.opacity(0.85))
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
     }
 
     private func formatted(_ seconds: Int) -> String {
@@ -245,5 +266,6 @@ struct StationView: View {
         .environmentObject(StationConfig())
         .environmentObject(KioskMode())
         .environmentObject(CaptureScheduler())
+        .environmentObject(DeviceHealth())
         .preferredColorScheme(.dark)
 }

@@ -27,6 +27,11 @@ final class CaptureScheduler: ObservableObject {
     /// Set by the app; returns false when the camera is not in a state to record.
     var onFire: (() -> Bool)?
 
+    /// Returns a staff-facing reason to skip this slot (low battery, full disk,
+    /// overheating), or nil when it is safe to record. The schedule itself
+    /// keeps running — conditions clear and the next slot fires normally.
+    var captureBlocked: (() -> String?)?
+
     private var ticker: Task<Void, Never>?
     private var nextFireAt: Date?
 
@@ -93,10 +98,12 @@ final class CaptureScheduler: ObservableObject {
     }
 
     private func fire() {
-        let started = onFire?() ?? false
-        if started { capturesThisSession += 1 }
-        // Reschedule either way. A camera that was busy or recovering should
-        // not stop the schedule — it just misses this slot.
+        if captureBlocked?() == nil {
+            let started = onFire?() ?? false
+            if started { capturesThisSession += 1 }
+        }
+        // Reschedule either way. A blocked device or busy camera should not
+        // stop the schedule — it just misses this slot and tries the next.
         scheduleNext(after: TimeInterval(intervalMinutes * 60))
     }
 }

@@ -75,15 +75,37 @@ final class StationConfig: ObservableObject {
         return refreshed.idToken
     }
 
-    /// Authenticate and report liveness. Called on launch and on the heartbeat,
-    /// so the dashboard can tell whether the station is still online.
-    func refreshAuthAndPing() async {
+    /// What the station reports home on every heartbeat. This is the owner's
+    /// only window into a phone on another continent: a stale lastSeenAt says
+    /// the app is dead, an uncharging battery says the charger was knocked out,
+    /// a shrinking disk says Wi-Fi has been down for days.
+    struct Telemetry {
+        var batteryPercent: Int?
+        var isCharging: Bool?
+        var freeDiskMB: Int?
+        var pendingUploads: Int?
+        var isCapturing: Bool?
+        var intervalMinutes: Int?
+        var blocked: String?
+    }
+
+    /// Authenticate and report liveness plus device health. Called on launch
+    /// and on the heartbeat.
+    func refreshAuthAndPing(_ telemetry: Telemetry = Telemetry()) async {
         guard !bakedRefreshToken.isEmpty else { return }
         do {
             let token = try await idToken()
+            var fields: [String: Any] = ["lastSeenAt": Date(), "appVersion": Self.appVersion]
+            if let v = telemetry.batteryPercent { fields["batteryPercent"] = v }
+            if let v = telemetry.isCharging { fields["isCharging"] = v }
+            if let v = telemetry.freeDiskMB { fields["freeDiskMB"] = v }
+            if let v = telemetry.pendingUploads { fields["pendingUploads"] = v }
+            if let v = telemetry.isCapturing { fields["isCapturing"] = v }
+            if let v = telemetry.intervalMinutes { fields["intervalMinutes"] = v }
+            fields["blocked"] = telemetry.blocked ?? ""
             try? await FirebaseREST.patchDocument(
                 config: config, idToken: token, collection: "csStations", documentId: bakedUID,
-                fields: ["lastSeenAt": Date(), "appVersion": Self.appVersion]
+                fields: fields
             )
         } catch {
             isAuthenticated = false
