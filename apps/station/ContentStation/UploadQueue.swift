@@ -178,18 +178,30 @@ final class UploadQueue: ObservableObject {
                         progress: @escaping (Double) -> Void) async throws -> String {
         let captureId = fileURL.deletingPathExtension().lastPathComponent.lowercased()
         let storagePath = "captures/\(captureId)/raw.mp4"
-        let token = try await station.idToken()
+        var token = try await station.idToken()
         guard let uid = station.uid else {
             throw FirebaseREST.FirebaseError.malformedResponse
         }
 
         progress(0.1)
-        try await FirebaseREST.upload(
-            config: station.config,
-            idToken: token,
-            objectPath: storagePath,
-            fileURL: fileURL
-        )
+        do {
+            try await FirebaseREST.upload(
+                config: station.config,
+                idToken: token,
+                objectPath: storagePath,
+                fileURL: fileURL
+            )
+        } catch let error as FirebaseREST.FirebaseError where error.isAuthDenied {
+            // The approval claim probably changed under us. Mint a fresh token
+            // and try once more before backing off.
+            token = try await station.idToken(force: true)
+            try await FirebaseREST.upload(
+                config: station.config,
+                idToken: token,
+                objectPath: storagePath,
+                fileURL: fileURL
+            )
+        }
 
         progress(0.8)
         let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path)

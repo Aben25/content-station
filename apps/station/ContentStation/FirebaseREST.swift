@@ -67,6 +67,14 @@ enum FirebaseREST {
             guard case let .http(code, body) = self else { return false }
             return code == 409 && body.contains("ALREADY_EXISTS")
         }
+
+        /// The server rejected this token. Usually the station's approval claim
+        /// changed and the cached token predates it, so a forced refresh is
+        /// worth one retry before treating it as a real failure.
+        var isAuthDenied: Bool {
+            guard case let .http(code, _) = self else { return false }
+            return code == 401 || code == 403
+        }
     }
 
     private static func send(_ request: URLRequest) async throws -> Data {

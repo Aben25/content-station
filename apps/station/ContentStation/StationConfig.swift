@@ -55,8 +55,14 @@ final class StationConfig: ObservableObject {
     /// A valid ID token, refreshing when the cached one is close to expiry.
     /// Always derived from the baked refresh token, so it works on a factory
     /// reset device with no stored state.
-    func idToken() async throws -> String {
-        if let session, session.expiresAt > Date() {
+    ///
+    /// `force` discards the cached token. Approval travels as a custom claim,
+    /// and claims only appear in a freshly minted token — without this, an
+    /// approval change would take up to an hour to reach the station in either
+    /// direction: a revoked station would keep uploading, and a re-approved one
+    /// would stay locked out.
+    func idToken(force: Bool = false) async throws -> String {
+        if !force, let session, session.expiresAt > Date() {
             return session.idToken
         }
         guard !bakedRefreshToken.isEmpty else {
