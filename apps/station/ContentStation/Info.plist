@@ -26,6 +26,8 @@
 	<string>lemekeru</string>
 	<key>FirebaseStorageBucket</key>
 	<string>lemekeru-content-station</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

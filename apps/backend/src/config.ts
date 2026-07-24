@@ -73,4 +73,8 @@ export const config = {
 
   // Pilot hardening
   rawRetentionDays: Number(process.env.RAW_RETENTION_DAYS ?? 7),
+
+  // Delete the raw upload from Cloud Storage once a branded render exists.
+  // Set DELETE_RAW_AFTER_RENDER=false to keep originals for re-editing.
+  deleteRawAfterRender: (process.env.DELETE_RAW_AFTER_RENDER ?? "true") !== "false",
 } as const;

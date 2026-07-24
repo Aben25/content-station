@@ -128,6 +128,15 @@ async function processCapture(doc: DocumentSnapshot): Promise<void> {
     ? await uploadArtifact(captureId, brandedPath, "branded.mp4")
     : null;
 
+  // Once a branded render exists in Storage, the raw upload is dead weight: the
+  // owner reviews the render, and a copy stays on this machine until the
+  // retention sweeper takes it. A 15s clip costs ~9 MB raw, so keeping both
+  // roughly doubles the bill for footage nobody looks at twice.
+  if (brandedStoragePath && config.deleteRawAfterRender) {
+    await bucket().file(data.storagePath).delete({ ignoreNotFound: true });
+    log(captureId, "raw removed from Storage (branded render kept)");
+  }
+
   await doc.ref.update({
     status: "needs_review",
     processedBy: config.firebase.workerId,
@@ -136,6 +145,7 @@ async function processCapture(doc: DocumentSnapshot): Promise<void> {
     plan,
     thumbStoragePath,
     brandedStoragePath,
+    rawDeleted: Boolean(brandedStoragePath && config.deleteRawAfterRender),
     localBrandedPath: brandedPath ?? null,
     localThumbnailPath: thumbnailPath,
     localRawPath: rawPath,
