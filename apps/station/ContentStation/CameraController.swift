@@ -56,8 +56,9 @@ final class CameraController: NSObject, ObservableObject {
     }
 
     @objc private func sessionRuntimeError(_ note: Notification) {
-        let err = note.userInfo?[AVCaptureSessionErrorKey] as? AVError
-        DispatchQueue.main.async { self.state = .error(err?.localizedDescription ?? "Camera error") }
+        // AVFoundation's own text ("The operation could not be completed") means
+        // nothing to shop staff. Since recovery is automatic, say that instead.
+        DispatchQueue.main.async { self.state = .error("Camera unavailable — reconnecting…") }
         // Media services can take a moment to come back after a reset.
         sessionQueue.asyncAfter(deadline: .now() + 2) { [weak self] in
             self?.restartIfNeeded()
