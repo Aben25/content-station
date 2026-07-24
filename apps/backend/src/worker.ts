@@ -5,7 +5,15 @@ import { FieldValue, Timestamp, type DocumentSnapshot } from "firebase-admin/fir
 import { getAuth } from "firebase-admin/auth";
 import { config } from "./config.js";
 import { db, bucket, CAPTURES, STATIONS } from "./firebase.js";
-import { probeVideo, extractThumbnail, transcribe, renderBranded } from "./processing.js";
+import {
+  probeVideo,
+  extractThumbnail,
+  transcribe,
+  renderBranded,
+  measureMotion,
+  extractFrames,
+} from "./processing.js";
+import { describeScene, type SceneDescription } from "./vision.js";
 import { generateContentPlan } from "./hermes.js";
 import { createPostizDraft } from "./postiz.js";
 import type { CaptureRecord } from "./store.js";
@@ -97,7 +105,35 @@ async function processCapture(doc: DocumentSnapshot): Promise<void> {
   log(captureId, `downloaded ${data.storagePath}`);
 
   const probe = await probeVideo(rawPath);
+
+  // Cheapest gate first: a station films the same corner all day and most
+  // clips show nothing happening. Discard those before paying to describe or
+  // render them.
+  if (config.cullStaticClips) {
+    const motion = await measureMotion(rawPath);
+    if (motion < config.motionThreshold) {
+      await cull(doc, `nothing moving in frame (motion ${motion.toFixed(6)})`, { motion });
+      return;
+    }
+  }
+
   const thumbnailPath = await extractThumbnail(rawPath, dir);
+
+  // Look at the footage before writing about it.
+  let scene: SceneDescription | null = null;
+  try {
+    const frames = await extractFrames(rawPath, dir, probe.durationSec, config.vision.frames);
+    scene = await describeScene(frames);
+    if (scene) log(captureId, `scene: ${scene.description.slice(0, 90)}`);
+  } catch (err) {
+    // Vision is an improvement, not a dependency — fall back to transcript-only.
+    console.warn(`[worker] ${captureId} vision failed: ${err instanceof Error ? err.message : err}`);
+  }
+
+  if (scene && !scene.showsBusiness) {
+    await cull(doc, scene.reason || "frames do not show the business", { scene });
+    return;
+  }
 
   let transcript = "";
   let srtPath: string | null = null;
@@ -108,7 +144,11 @@ async function processCapture(doc: DocumentSnapshot): Promise<void> {
   }
   log(captureId, `transcribed ${transcript.length} chars`);
 
-  const plan = await generateContentPlan({ transcript, probeWarnings: probe.warnings });
+  const plan = await generateContentPlan({
+    transcript,
+    probeWarnings: probe.warnings,
+    scene: scene ? { description: scene.description, objects: scene.objects } : null,
+  });
 
   let brandedPath: string | undefined;
   if (plan.usable) {
@@ -143,6 +183,7 @@ async function processCapture(doc: DocumentSnapshot): Promise<void> {
     probe,
     transcript,
     plan,
+    scene: scene ?? null,
     thumbStoragePath,
     brandedStoragePath,
     rawDeleted: Boolean(brandedStoragePath && config.deleteRawAfterRender),
@@ -155,6 +196,31 @@ async function processCapture(doc: DocumentSnapshot): Promise<void> {
     updatedAt: FieldValue.serverTimestamp(),
   });
   log(captureId, "→ needs_review");
+}
+
+/// Discard a capture that is not worth a human's attention, deleting its files
+/// the same way a rejection does. The reason is kept so the owner can see what
+/// is being filtered out and retune the thresholds rather than wonder where the
+/// clips went.
+async function cull(
+  doc: DocumentSnapshot,
+  reason: string,
+  extra: Record<string, unknown> = {},
+): Promise<void> {
+  const captureId = doc.id;
+  await bucket().deleteFiles({ prefix: `captures/${captureId}/` });
+  await rm(workDir(captureId), { recursive: true, force: true });
+  await doc.ref.update({
+    status: "culled",
+    cullReason: reason,
+    processedBy: config.firebase.workerId,
+    storagePath: FieldValue.delete(),
+    claimedBy: FieldValue.delete(),
+    claimedAt: FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp(),
+    ...extra,
+  });
+  log(captureId, `culled — ${reason}`);
 }
 
 /// The owner edited captions and asked for publication. Only this machine holds

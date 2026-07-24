@@ -74,6 +74,20 @@ export const config = {
   // Pilot hardening
   rawRetentionDays: Number(process.env.RAW_RETENTION_DAYS ?? 7),
 
+  // Look at the footage before writing about it. Without this the content
+  // model only ever sees the transcript, and a silent clip leaves it inventing.
+  vision: {
+    enabled: (process.env.VISION_ENABLED ?? "true") !== "false",
+    model: process.env.VISION_MODEL ?? process.env.CONTENT_LLM_MODEL ?? "stepfun/step-3.7-flash:free",
+    maxTokens: Number(process.env.VISION_MAX_TOKENS ?? 3000),
+    frames: Number(process.env.VISION_FRAMES ?? 3),
+  },
+
+  // Discard clips where nothing moves before spending anything on describing
+  // them. Handheld footage measures ~0.013, a static frame ~0.000003.
+  motionThreshold: Number(process.env.MOTION_THRESHOLD ?? 0.0005),
+  cullStaticClips: (process.env.CULL_STATIC_CLIPS ?? "true") !== "false",
+
   // Delete the raw upload from Cloud Storage once a branded render exists.
   // Set DELETE_RAW_AFTER_RENDER=false to keep originals for re-editing.
   deleteRawAfterRender: (process.env.DELETE_RAW_AFTER_RENDER ?? "true") !== "false",

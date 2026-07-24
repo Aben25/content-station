@@ -62,7 +62,7 @@ types exist today:
 
 | Claim on | Working status | Success | Failure |
 |---|---|---|---|
-| `uploaded` | `processing` | `needs_review` | `error` |
+| `uploaded` | `processing` | `needs_review` or `culled` | `error` |
 | `approve_requested` | `publishing` | `approved` | `publish_failed` |
 
 **Claim protocol** — required for any processor, and what makes processors
@@ -88,6 +88,7 @@ under the same prefix, and write:
   "transcript": "...",                    // "" if none — never omit
   "probe": { "durationSec": 15.0, "width": 720, "height": 1280, "warnings": [] },
   "plan": { /* ContentPlan, below */ },
+  "scene": { "description": "...", "objects": ["..."], "showsBusiness": true, "reason": "..." },
   "thumbStoragePath": "captures/<id>/thumbnail.jpg",
   "brandedStoragePath": "captures/<id>/branded.mp4"   // or null if unusable
 }
@@ -101,6 +102,15 @@ deleting the prefix deletes the capture completely.
 `plan.captions`, then writing `postizDraftId` (or an equivalent external id)
 and `status: "approved"`. Publishing credentials belong to the processor, never
 to the dashboard or the station.
+
+**Culled captures.** A station on a timer films the same corner all day, so
+most clips show nothing worth an owner's attention. A processor may end a
+capture as `culled` instead of `needs_review`, writing `cullReason` (a sentence
+the owner can read) and deleting the capture's Storage objects exactly as a
+rejection does. Culling must be conservative: a measurement that fails should
+let the capture through, never discard it. The reference implementation culls
+on two signals — no motion in frame, and a vision pass judging that the frames
+do not show the business at all.
 
 **Rejected captures:** a processor must treat `status: "rejected"` as a
 deletion order — remove every object under the capture's prefix and set
@@ -127,6 +137,12 @@ any harness, or none — must produce:
   "warnings": ["surfaced verbatim to the owner"]
 }
 ```
+
+**Ground the copy in the footage.** A generator that only sees a transcript
+will invent when the transcript is empty — a real capture of a desk and two
+laptops produced "1 WRENCH = 3 JOBS DONE" for a hardware store. Describe the
+frames and pass that description to the writer, and keep concrete claims
+answerable to what was actually seen or said.
 
 Two invariants regardless of generator:
 

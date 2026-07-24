@@ -17,6 +17,9 @@ export interface ContentPlan {
 interface PlanInput {
   transcript: string;
   probeWarnings: string[];
+  /// What the camera saw. Absent when vision is disabled or failed, in which
+  /// case the model is working from the transcript alone and may invent.
+  scene?: { description: string; objects: string[] } | null;
 }
 
 const FALLBACK_HOOKS = [
@@ -40,7 +43,7 @@ export async function generateContentPlan(input: PlanInput): Promise<ContentPlan
 
   // Deterministic fallback (LLM unreachable)
   const b = config.brand;
-  const excerpt = input.transcript.split(" ").slice(0, 12).join(" ");
+  const excerpt = (input.scene?.description || input.transcript).split(" ").slice(0, 12).join(" ");
   const hook = excerpt ? `"${excerpt}…"` : FALLBACK_HOOKS[0];
   return {
     usable: true,
@@ -97,8 +100,20 @@ Return ONLY valid JSON matching this exact shape:
 "onScreenTitle":string,"captions":{"instagram":string,"tiktok":string,"facebook":string},
 "cta":string,"hashtags":[strings],"platforms":[strings],"recommendedTime":string,"warnings":[strings]}`;
 
-  const user = `Transcript: """${input.transcript || "(no speech)"}"""
+  const seen = input.scene?.description
+    ? `What the camera actually shows: """${input.scene.description}"""
+Visible items: ${input.scene.objects.join(", ") || "none listed"}`
+    : `What the camera shows: (not analysed — do not describe specific products, tools or activities you cannot confirm)`;
+
+  const user = `${seen}
+Transcript: """${input.transcript || "(no speech)"}"""
 Quality warnings: ${input.probeWarnings.join("; ") || "none"}
+
+Write about this clip only. Every concrete claim — products, actions, people —
+must be supported by what the camera shows or the transcript. If neither gives
+you specifics, write something true and general about the business rather than
+inventing detail.
+
 Create the content plan for this 15-30s vertical clip.`;
 
   const res = await fetch(`${config.llmBaseUrl.replace(/\/$/, "")}/chat/completions`, {

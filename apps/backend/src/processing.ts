@@ -303,3 +303,52 @@ export async function renderBranded(opts: RenderOptions): Promise<string> {
   ]);
   return out;
 }
+
+/// Mean scene-change score across the clip: how much the picture actually
+/// moves. A mounted station films the same corner all day, so most clips show
+/// an empty shop and nothing else. Real handheld footage measures around 0.013;
+/// a genuinely static frame measures 0.000003 — four orders of magnitude apart,
+/// which is enough separation to throw away dead clips before spending anything
+/// on describing them.
+export async function measureMotion(rawPath: string): Promise<number> {
+  try {
+    const { stdout, stderr } = await run(
+      config.ffmpeg,
+      ["-v", "error", "-i", rawPath, "-vf", "select='gt(scene,0)',metadata=print:file=-", "-an", "-f", "null", "-"],
+      { maxBuffer: 32 * 1024 * 1024 },
+    );
+    // metadata=print writes to stdout; ffmpeg's own logging goes to stderr.
+    const scores = [...`${stdout}${stderr}`.matchAll(/scene_score=([0-9.]+)/g)].map((m) => Number(m[1]));
+    // No readings at all means the measurement did not work, not that the clip
+    // is empty. Fail open: culling is an optimisation and must never be the
+    // reason real footage is thrown away.
+    if (!scores.length) return Number.POSITIVE_INFINITY;
+    return scores.reduce((a, b) => a + b, 0) / scores.length;
+  } catch {
+    // Never let the culling stage be the reason a capture fails.
+    return Number.POSITIVE_INFINITY;
+  }
+}
+
+/// Evenly spaced stills for the vision pass. One frame from the middle would
+/// miss a customer who walks in at the end.
+export async function extractFrames(
+  rawPath: string,
+  outDir: string,
+  durationSec: number,
+  count = 3,
+): Promise<string[]> {
+  await mkdir(outDir, { recursive: true });
+  const paths: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const at = Math.max(0, durationSec * ((i + 1) / (count + 1)));
+    const out = path.join(outDir, `frame-${i}.jpg`);
+    try {
+      await ffmpeg(["-y", "-ss", at.toFixed(2), "-i", rawPath, "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "5", out]);
+      paths.push(out);
+    } catch {
+      // A frame we cannot grab is simply one fewer frame to describe.
+    }
+  }
+  return paths;
+}
