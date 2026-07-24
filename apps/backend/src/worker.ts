@@ -130,6 +130,7 @@ async function processCapture(doc: DocumentSnapshot): Promise<void> {
 
   await doc.ref.update({
     status: "needs_review",
+    processedBy: config.firebase.workerId,
     probe,
     transcript,
     plan,
@@ -174,6 +175,7 @@ async function publishCapture(doc: DocumentSnapshot): Promise<void> {
   const result = await createPostizDraft(rec);
   await doc.ref.update({
     status: "approved",
+    processedBy: config.firebase.workerId,
     postizDraftId: result.draftId,
     claimedBy: FieldValue.delete(),
     claimedAt: FieldValue.delete(),
