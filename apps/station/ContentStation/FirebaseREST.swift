@@ -38,11 +38,27 @@ enum FirebaseREST {
         case http(Int, String)
         case malformedResponse
 
+        /// Staff-facing text. Raw Firebase JSON on a shop wall helps nobody.
         var errorDescription: String? {
             switch self {
-            case let .http(code, body): return "Firebase \(code): \(body.prefix(200))"
-            case .malformedResponse: return "Unexpected response from Firebase"
+            case .malformedResponse:
+                return "Unexpected response from the server"
+            case let .http(code, _) where code == 401 || code == 403:
+                return "This station is not approved yet"
+            case let .http(code, _) where (500...599).contains(code):
+                return "Server unavailable — will retry"
+            case .http:
+                return isIdentityGone ? "Re-registering this station…" : "Connection problem — will retry"
             }
+        }
+
+        /// The stored credentials refer to an identity the server no longer
+        /// has: revoked, deleted, or expired beyond recovery. Recoverable only
+        /// by starting over with a fresh identity.
+        var isIdentityGone: Bool {
+            guard case let .http(_, body) = self else { return false }
+            return ["USER_NOT_FOUND", "USER_DISABLED", "TOKEN_EXPIRED", "INVALID_REFRESH_TOKEN"]
+                .contains { body.contains($0) }
         }
     }
 

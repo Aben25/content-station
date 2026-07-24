@@ -50,13 +50,32 @@ final class StationConfig: ObservableObject {
             return session.idToken
         }
         if let refreshToken = UserDefaults.standard.string(forKey: Key.refreshToken) {
-            let refreshed = try await FirebaseREST.refresh(config: config, refreshToken: refreshToken)
-            store(refreshed)
-            return refreshed.idToken
+            do {
+                let refreshed = try await FirebaseREST.refresh(config: config, refreshToken: refreshToken)
+                store(refreshed)
+                return refreshed.idToken
+            } catch let error as FirebaseREST.FirebaseError where error.isIdentityGone {
+                // The owner revoked this station, or its identity was deleted
+                // server-side. Retrying the dead token forever would leave the
+                // station bricked on a red screen with nobody on site able to
+                // fix it, so start over as a new station and show a fresh
+                // pairing code.
+                resetIdentity()
+            }
         }
         let fresh = try await FirebaseREST.signInAnonymously(config: config)
         store(fresh)
         return fresh.idToken
+    }
+
+    /// Forget this station's Firebase identity but keep the pairing code, so
+    /// staff see the same six letters they may already have read out.
+    private func resetIdentity() {
+        session = nil
+        UserDefaults.standard.removeObject(forKey: Key.refreshToken)
+        UserDefaults.standard.removeObject(forKey: Key.uid)
+        uid = nil
+        approved = false
     }
 
     private func store(_ session: FirebaseREST.Session) {
