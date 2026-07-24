@@ -47,7 +47,19 @@ if (!arg) {
 }
 
 const code = arg.trim().toUpperCase();
-const match = snap.docs.find((d) => d.data().pairingCode === code);
+// A station that recovered its identity re-registers under a new uid with the
+// same code, so several rows can share it. The one that checked in most
+// recently is the live device; the rest are residue of dead identities.
+const matches = snap.docs
+  .filter((d) => d.data().pairingCode === code)
+  .sort((a, b) => (b.data().lastSeenAt?.toMillis() ?? 0) - (a.data().lastSeenAt?.toMillis() ?? 0));
+const match = matches[0];
+
+for (const stale of matches.slice(1)) {
+  await getAuth().deleteUser(stale.id).catch(() => {});
+  await stale.ref.delete();
+  console.log(`cleaned up stale registration ${stale.id.slice(0, 8)} (same code, older lastSeen)`);
+}
 
 if (!match) {
   console.error(`No station is waiting with code ${code}.`);

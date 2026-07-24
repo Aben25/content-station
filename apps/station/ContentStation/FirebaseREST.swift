@@ -60,6 +60,13 @@ enum FirebaseREST {
             return ["USER_NOT_FOUND", "USER_DISABLED", "TOKEN_EXPIRED", "INVALID_REFRESH_TOKEN"]
                 .contains { body.contains($0) }
         }
+
+        /// A create hit a document that is already there — meaning an earlier
+        /// attempt succeeded and only its response was lost in transit.
+        var isAlreadyExists: Bool {
+            guard case let .http(code, body) = self else { return false }
+            return code == 409 && body.contains("ALREADY_EXISTS")
+        }
     }
 
     private static func send(_ request: URLRequest) async throws -> Data {

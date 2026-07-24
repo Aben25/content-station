@@ -168,9 +168,15 @@ final class UploadQueue: ObservableObject {
     /// Storage object first, Firestore document second. That order matters: the
     /// worker claims on the document, so a document only ever appears once its
     /// footage is fully uploaded.
+    ///
+    /// The whole operation is idempotent. The capture id comes from the file
+    /// name (already a UUID from the recorder), so a retry after a half-failed
+    /// attempt overwrites the same Storage object instead of orphaning it, and
+    /// an "already exists" on the document means a previous attempt actually
+    /// succeeded and only the response was lost.
     private func upload(_ fileURL: URL,
                         progress: @escaping (Double) -> Void) async throws -> String {
-        let captureId = UUID().uuidString.lowercased()
+        let captureId = fileURL.deletingPathExtension().lastPathComponent.lowercased()
         let storagePath = "captures/\(captureId)/raw.mp4"
         let token = try await station.idToken()
         guard let uid = station.uid else {
@@ -186,21 +192,26 @@ final class UploadQueue: ObservableObject {
         )
 
         progress(0.8)
-        let bytes = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int) ?? 0
-        try await FirebaseREST.createDocument(
-            config: station.config,
-            idToken: token,
-            collection: "csCaptures",
-            documentId: captureId,
-            fields: [
-                "stationId": uid,
-                "status": "uploaded",
-                "storagePath": storagePath,
-                "bytes": bytes ?? 0,
-                "createdAt": Date(),
-                "updatedAt": Date(),
-            ]
-        )
+        let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
+        let bytes = (attributes?[.size] as? Int) ?? 0
+        do {
+            try await FirebaseREST.createDocument(
+                config: station.config,
+                idToken: token,
+                collection: "csCaptures",
+                documentId: captureId,
+                fields: [
+                    "stationId": uid,
+                    "status": "uploaded",
+                    "storagePath": storagePath,
+                    "bytes": bytes,
+                    "createdAt": Date(),
+                    "updatedAt": Date(),
+                ]
+            )
+        } catch let error as FirebaseREST.FirebaseError where error.isAlreadyExists {
+            // A previous attempt finished; this retry only re-sent the bytes.
+        }
         progress(1.0)
         return captureId
     }
