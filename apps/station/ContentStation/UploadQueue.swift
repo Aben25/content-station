@@ -89,11 +89,11 @@ final class UploadQueue: ObservableObject {
         process()
     }
 
-    /// Retry everything now. Called when the station is approved, when the app
-    /// returns to the foreground, and on the idle heartbeat — any of which may
-    /// mean the thing that was blocking uploads has gone away.
+    /// Retry everything now. Called when the app returns to the foreground and
+    /// on the idle heartbeat — either may mean the thing that was blocking
+    /// uploads has gone away.
     func kick() {
-        guard station.approved else { return }
+        guard station.uid != nil else { return }
         for idx in items.indices {
             if case .failed = items[idx].status { items[idx].status = .pending }
         }
@@ -111,9 +111,9 @@ final class UploadQueue: ObservableObject {
         guard !isProcessing,
               let idx = items.firstIndex(where: { $0.status == .pending }) else { return }
 
-        // Unpaired stations keep recording and keep the footage; uploads resume
-        // once the owner approves this station and `kick()` is called.
-        guard station.approved else { return }
+        // Credentials are baked in, so there is nothing to wait for except the
+        // network. A build without credentials keeps the footage on disk.
+        guard station.uid != nil else { return }
 
         isProcessing = true
         let item = items[idx]

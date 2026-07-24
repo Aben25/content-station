@@ -178,6 +178,16 @@ final class CameraController: NSObject, ObservableObject {
         }
     }
 
+    /// Start a scheduled capture. No countdown — nobody is standing there to
+    /// count down for. Returns false when the camera is busy or recovering, so
+    /// the scheduler can skip the slot instead of queueing up a backlog.
+    @discardableResult
+    func captureNow() -> Bool {
+        guard state == .ready, session.isRunning, !movieOutput.isRecording else { return false }
+        startRecording()
+        return true
+    }
+
     func stopRecording() {
         guard movieOutput.isRecording else { return }
         movieOutput.stopRecording()

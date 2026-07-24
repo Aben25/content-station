@@ -21,3 +21,6 @@ logs/
 # Build artifacts
 apps/station/build/
 tools/models/ggml-base.bin
+
+# Baked station credentials — never commit (public repo)
+apps/station/ContentStation/StationCredentials.plist

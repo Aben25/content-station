@@ -1,15 +1,13 @@
 import SwiftUI
 
-/// The main station screen — the only screen staff interact with.
-/// Live preview always visible, 9:16 capture-zone guide, big capture button,
-/// red recording indicator, status footer.
+/// The only screen. Staff plug the phone in and press Start; the station films
+/// on the chosen interval until somebody presses Stop.
 struct StationView: View {
     @EnvironmentObject var camera: CameraController
     @EnvironmentObject var uploader: UploadQueue
     @EnvironmentObject var station: StationConfig
     @EnvironmentObject var kiosk: KioskMode
-
-    @State private var showSetup = false
+    @EnvironmentObject var scheduler: CaptureScheduler
 
     var body: some View {
         ZStack {
@@ -30,15 +28,7 @@ struct StationView: View {
         .onTapGesture { kiosk.noteActivity() }
         .task {
             await camera.configure()
-            await station.registerAndRefresh()
-            if !station.approved { showSetup = true }
-        }
-        .onChange(of: station.approved) { _, approved in
-            // Footage recorded before pairing uploads as soon as it lands.
-            if approved { uploader.kick() }
-        }
-        .sheet(isPresented: $showSetup) {
-            SetupSheet()
+            await station.refreshAuthAndPing()
         }
     }
 
@@ -64,25 +54,20 @@ struct StationView: View {
                 if case .recording = camera.state {
                     recordingOverlay
                 }
-                if case .countdown(let n) = camera.state {
-                    Text("\(n)")
-                        .font(.system(size: 120, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .shadow(radius: 8)
-                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
 
             statusRow
-                .padding(.top, 12)
+                .padding(.top, 14)
 
-            promptRow
-                .padding(.top, 8)
-                .padding(.horizontal, 24)
+            if !scheduler.isRunning {
+                intervalPicker
+                    .padding(.top, 14)
+            }
 
-            captureButton
-                .padding(.vertical, 12)
+            startStopButton
+                .padding(.vertical, 18)
 
             footer
                 .padding(.bottom, 12)
@@ -108,106 +93,125 @@ struct StationView: View {
         }
     }
 
+    // MARK: - Status
+
+    /// Schedule state first, camera trouble underneath it. A camera hiccup must
+    /// not hide whether the station is still running and when the next clip is
+    /// due — that is the only thing anyone on site can check at a glance.
     @ViewBuilder
     private var statusRow: some View {
-        Group {
-            switch camera.state {
-            case .ready:
-                Label("READY", systemImage: "circle.fill")
-                    .foregroundStyle(.green)
-            case .countdown:
-                Label("GET READY", systemImage: "timer")
-                    .foregroundStyle(.yellow)
-            case .recording:
+        VStack(spacing: 6) {
+            if case .recording = camera.state {
                 Label("RECORDING", systemImage: "record.circle")
                     .foregroundStyle(.red)
-            case .saving:
-                Label("SAVING…", systemImage: "arrow.down.doc")
-                    .foregroundStyle(.orange)
-            case .error(let message):
+                    .font(.subheadline.monospaced().bold())
+            } else if scheduler.isRunning {
+                Label("RUNNING", systemImage: "circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.subheadline.monospaced().bold())
+                Text("Next clip in \(formatted(scheduler.secondsUntilNext))")
+                    .font(.callout.monospaced())
+                    .foregroundStyle(.white.opacity(0.65))
+            } else {
+                Label("STOPPED", systemImage: "pause.circle")
+                    .foregroundStyle(.white.opacity(0.6))
+                    .font(.subheadline.monospaced().bold())
+            }
+
+            if case .error(let message) = camera.state {
                 Label(message, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
-                    .lineLimit(1)
-            case .unauthorized:
-                EmptyView()
+                    .font(.caption.monospaced())
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
             }
-        }
-        .font(.subheadline.monospaced().bold())
-    }
-
-    /// A fixed camera films the same thing forever unless someone is told what
-    /// to point it at. Rotates every 20 minutes.
-    @ViewBuilder
-    private var promptRow: some View {
-        if case .ready = camera.state {
-            Text(CapturePrompts.current())
-                .font(.callout.weight(.medium))
-                .foregroundStyle(.white.opacity(0.75))
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .transition(.opacity)
         }
     }
 
-    private var captureButton: some View {
-        Button {
-            kiosk.noteActivity()
-            if case .recording = camera.state {
-                camera.stopRecording()
-            } else {
-                camera.tapCapture()
-            }
-        } label: {
-            ZStack {
-                Circle()
-                    .stroke(.white, lineWidth: 5)
-                    .frame(width: 84, height: 84)
-                if case .recording = camera.state {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(.red)
-                        .frame(width: 34, height: 34)
-                } else {
-                    Circle()
-                        .fill(camera.state == .ready ? .red : .gray)
-                        .frame(width: 66, height: 66)
+    private func formatted(_ seconds: Int) -> String {
+        seconds >= 60 ? "\(seconds / 60)m \(seconds % 60)s" : "\(seconds)s"
+    }
+
+    private var intervalPicker: some View {
+        VStack(spacing: 8) {
+            Text("Film a clip every")
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.6))
+            HStack(spacing: 8) {
+                ForEach(CaptureScheduler.intervalOptions, id: \.self) { minutes in
+                    Button {
+                        kiosk.noteActivity()
+                        scheduler.setInterval(minutes)
+                    } label: {
+                        Text(minutes >= 60 ? "\(minutes / 60)h" : "\(minutes)m")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(width: 52, height: 36)
+                            .background(
+                                scheduler.intervalMinutes == minutes ? Color.white : Color.white.opacity(0.12),
+                                in: RoundedRectangle(cornerRadius: 10)
+                            )
+                            .foregroundStyle(scheduler.intervalMinutes == minutes ? .black : .white)
+                    }
                 }
             }
         }
-        .disabled(buttonDisabled)
-        .accessibilityLabel(Text(isRecording ? "Stop" : "Capture Moment"))
     }
 
-    private var isRecording: Bool {
-        if case .recording = camera.state { return true }
-        return false
-    }
-
-    private var buttonDisabled: Bool {
-        switch camera.state {
-        case .ready, .recording: return false
-        default: return true
+    private var startStopButton: some View {
+        Button {
+            kiosk.noteActivity()
+            scheduler.isRunning ? scheduler.stop() : scheduler.start()
+        } label: {
+            Text(scheduler.isRunning ? "STOP" : "START")
+                .font(.title2.weight(.bold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 64)
+                .background(scheduler.isRunning ? Color.red : Color.green, in: Capsule())
+                .foregroundStyle(.white)
+                .padding(.horizontal, 40)
         }
+        .disabled(station.isAuthenticated == false)
+        .opacity(station.isAuthenticated == false ? 0.4 : 1)
     }
 
     private var footer: some View {
-        HStack(spacing: 20) {
-            Button {
-                showSetup = true
-            } label: {
-                Label(station.approved ? "Paired" : "Pair", systemImage: station.approved ? "link" : "exclamationmark.triangle")
-                    .foregroundStyle(station.approved ? .green : .yellow)
-            }
-            Text("Uploads: \(uploader.pendingCount)")
+        HStack(spacing: 16) {
+            Label(connectionLabel, systemImage: connectionIcon)
+                .foregroundStyle(connectionColor)
+            Text("Clips: \(scheduler.capturesThisSession)")
                 .foregroundStyle(.white.opacity(0.8))
             Spacer()
-            if let last = camera.lastSavedURL {
-                Text("Saved ✓ \(last.lastPathComponent.prefix(8))…")
+            if uploader.pendingCount > 0 {
+                Text("Uploading \(uploader.pendingCount)")
+                    .foregroundStyle(.orange)
+            } else {
+                Text("All uploaded")
                     .foregroundStyle(.white.opacity(0.5))
-                    .lineLimit(1)
             }
         }
         .font(.caption.monospaced())
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 24)
+    }
+
+    private var connectionLabel: String {
+        switch station.isAuthenticated {
+        case .some(true): return "Connected"
+        case .some(false): return "Not connected"
+        case .none: return "Connecting…"
+        }
+    }
+
+    private var connectionIcon: String {
+        station.isAuthenticated == true ? "checkmark.icloud" : "exclamationmark.icloud"
+    }
+
+    private var connectionColor: Color {
+        switch station.isAuthenticated {
+        case .some(true): return .green
+        case .some(false): return .red
+        case .none: return .yellow
+        }
     }
 
     // MARK: - Permissions
@@ -220,7 +224,7 @@ struct StationView: View {
             Text("Camera & Microphone Access Needed")
                 .font(.title2.bold())
                 .foregroundStyle(.white)
-            Text("Content Station captures short videos of moments at your business. It needs camera access to record and microphone access for sound.")
+            Text("Content Station records short clips of moments at your business. Please allow camera and microphone access, then reopen the app.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.white.opacity(0.8))
             Button("Open Settings") {
@@ -240,5 +244,6 @@ struct StationView: View {
         .environmentObject(UploadQueue())
         .environmentObject(StationConfig())
         .environmentObject(KioskMode())
+        .environmentObject(CaptureScheduler())
         .preferredColorScheme(.dark)
 }

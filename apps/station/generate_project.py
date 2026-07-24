@@ -25,6 +25,13 @@ for f in SWIFT_FILES:
 IDS["assets_ref"] = gid()
 IDS["assets_buildfile"] = gid()
 
+# Baked station credentials. Gitignored, so a fresh clone simply builds without
+# them and the app reports that it needs provisioning.
+HAS_CREDENTIALS = os.path.exists(os.path.join(SRC_DIR, "StationCredentials.plist"))
+if HAS_CREDENTIALS:
+    IDS["creds_ref"] = gid()
+    IDS["creds_buildfile"] = gid()
+
 objects = {}
 
 objects[IDS["project"]] = {
@@ -43,6 +50,8 @@ objects[IDS["project"]] = {
 }
 
 children = [IDS[f"fileref_{f}"] for f in SWIFT_FILES] + [IDS["info_plist_ref"], IDS["assets_ref"]]
+if HAS_CREDENTIALS:
+    children.append(IDS["creds_ref"])
 objects[IDS["src_group"]] = {
     "isa": "PBXGroup", "children": children, "path": "ContentStation", "sourceTree": "<group>",
 }
@@ -77,6 +86,14 @@ objects[IDS["assets_ref"]] = {
 objects[IDS["assets_buildfile"]] = {
     "isa": "PBXBuildFile", "fileRef": IDS["assets_ref"],
 }
+if HAS_CREDENTIALS:
+    objects[IDS["creds_ref"]] = {
+        "isa": "PBXFileReference", "lastKnownFileType": "text.plist.xml",
+        "path": "StationCredentials.plist", "sourceTree": "<group>",
+    }
+    objects[IDS["creds_buildfile"]] = {
+        "isa": "PBXBuildFile", "fileRef": IDS["creds_ref"],
+    }
 objects[IDS["sources_phase"]] = {
     "isa": "PBXSourcesBuildPhase", "buildActionMask": 2147483647,
     "files": [IDS[f"buildfile_{f}"] for f in SWIFT_FILES], "runOnlyForDeploymentPostprocessing": 0,
@@ -87,7 +104,7 @@ objects[IDS["frameworks_phase"]] = {
 }
 objects[IDS["resources_phase"]] = {
     "isa": "PBXResourcesBuildPhase", "buildActionMask": 2147483647,
-    "files": [IDS["assets_buildfile"]],
+    "files": [IDS["assets_buildfile"]] + ([IDS["creds_buildfile"]] if HAS_CREDENTIALS else []),
     "runOnlyForDeploymentPostprocessing": 0,
 }
 
@@ -167,4 +184,5 @@ os.makedirs(proj_dir, exist_ok=True)
 with open(os.path.join(proj_dir, "project.pbxproj"), "wb") as fh:
     plistlib.dump(project, fh, fmt=plistlib.FMT_XML)
 
-print(f"Generated {proj_dir} with {len(SWIFT_FILES)} Swift files")
+suffix = " + baked credentials" if HAS_CREDENTIALS else " (no StationCredentials.plist — app will need provisioning)"
+print(f"Generated {proj_dir} with {len(SWIFT_FILES)} Swift files{suffix}")
