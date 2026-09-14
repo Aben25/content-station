@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { api } from '../api/index';
-import { errorMessage } from '../api/types';
+import { phoneAuthErrorMessage } from '../api/firebaseAuth';
 import { Button } from '../components/Button';
 import { useSession } from '../hooks/useSession';
 import { useToast } from '../hooks/useToast';
@@ -10,7 +10,6 @@ import { S_ERROR, S_H1, st } from '../lib/style';
 import { R, navigate, replace, stepRoute } from '../router';
 
 const BOX = 'flex:1;height:64px;border-radius:12px;background:#fff;border:1px solid rgba(23,22,20,.14);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:600';
-const MISMATCH = "That code didn't match. Try again or text a new one.";
 
 export function Code() {
   const phone = getPendingPhone();
@@ -20,6 +19,7 @@ export function Code() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const pending = useRef(false);
 
   useEffect(() => {
     if (!phone) replace(R.start);
@@ -27,25 +27,28 @@ export function Code() {
 
   const submit = useCallback(
     async (code: string) => {
-      if (busy) return;
+      if (pending.current) return;
+      pending.current = true;
       setBusy(true);
       setError(null);
       try {
         await api.verifyOtp(phone, code);
         const me = await refresh();
         replace(me ? stepRoute(me.onboarding_step) : R.home);
-      } catch {
-        setError(MISMATCH);
+      } catch (err) {
+        setError(phoneAuthErrorMessage(err));
         setDigits('');
         input.current?.focus();
       } finally {
+        pending.current = false;
         setBusy(false);
       }
     },
-    [busy, phone, refresh],
+    [phone, refresh],
   );
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (pending.current) return;
     const v = e.target.value.replace(/\D/g, '').slice(0, 6);
     setDigits(v);
     setError(null);
@@ -53,6 +56,10 @@ export function Code() {
   };
 
   const resend = async () => {
+    if (pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    setError(null);
     try {
       await api.sendOtp(phone);
       setDigits('');
@@ -60,13 +67,16 @@ export function Code() {
       toast('Texted a new code.');
       input.current?.focus();
     } catch (err) {
-      setError(errorMessage(err, "Couldn't send the code. Check your connection and try again."));
+      setError(phoneAuthErrorMessage(err, "Couldn't send the code. Check your connection and try again."));
+    } finally {
+      pending.current = false;
+      setBusy(false);
     }
   };
 
   return (
     <div style={st('flex:1;display:flex;flex-direction:column;padding:var(--top-page) 24px var(--bottom-page);gap:28px;overflow-y:auto')}>
-      <Button variant="back" onClick={() => navigate(R.start)} style={{ alignSelf: 'flex-start' }}>
+      <Button variant="back" disabled={busy} onClick={() => navigate(R.start)} style={{ alignSelf: 'flex-start' }}>
         Back
       </Button>
       <div style={st('display:flex;flex-direction:column;gap:10px')}>
@@ -81,6 +91,7 @@ export function Code() {
         ))}
         <input
           ref={input}
+          disabled={busy}
           value={digits}
           onChange={onChange}
           type="text"
@@ -107,7 +118,7 @@ export function Code() {
         />
       </div>
       {error && <div style={st(S_ERROR)}>{error}</div>}
-      <Button variant="link" onClick={resend} style={{ alignSelf: 'flex-start' }}>
+      <Button variant="link" onClick={resend} disabled={busy} style={{ alignSelf: 'flex-start' }}>
         Text it again
       </Button>
       <div style={st('flex:1')} />
