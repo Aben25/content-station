@@ -1,0 +1,14 @@
+.git
+.runtime
+.firebase
+**/node_modules
+**/.venv
+**/__pycache__
+**/.env
+**/.env.*
+**/*.log
+wall-app/build*
+wall-app/DerivedData
+**/*.p8
+**/*.pem
+**/*service-account*.json

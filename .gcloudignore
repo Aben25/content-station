@@ -1,0 +1,7 @@
+.gcloudignore
+.git
+.gitignore
+#!include:.gitignore
+**/*.p8
+**/*.pem
+**/*service-account*.json
