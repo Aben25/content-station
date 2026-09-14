@@ -111,7 +111,8 @@ def main():
     request('POST', '/device/heartbeat', {'battery': 100, 'thermal': 'nominal', 'wifi': 'strong',
         'storage_free_mb': 10000, 'state': 'idle', 'app_version': 'integration-test',
         'recording_seconds_today': round(duration)}, device_token)
-    home = Path(os.environ.get('OPENSHORTS_HOME', str(ROOT / '.runtime/openshorts'))).resolve()
+    home = Path(os.environ.get('OPENSHORTS_HOME') or local_secrets.get('OPENSHORTS_HOME')
+                or str(ROOT / '.runtime/openshorts')).resolve()
     settings = Settings(BASE, local_secrets['ENGINE_API_KEY'], home,
                         os.environ.get('OPENSHORTS_PYTHON', str(home / '.venv/bin/python')),
                         ROOT / '.runtime/jobs', clip_seconds=30)

@@ -21,8 +21,9 @@ function configuration() {
   for (const key of ['ENGINE_API_KEY', 'DEVICE_JWT_SECRET', 'MEDIA_SECRET', 'CRON_SECRET']) {
     saved[key] ||= randomBytes(32).toString('hex');
   }
+  if (process.env.OPENSHORTS_HOME) saved.OPENSHORTS_HOME = resolve(process.env.OPENSHORTS_HOME);
   writeFileSync(file, JSON.stringify(saved, null, 2) + '\n', { mode: 0o600 });
-  const openshorts = resolve(process.env.OPENSHORTS_HOME || resolve(runtime, 'openshorts'));
+  const openshorts = resolve(saved.OPENSHORTS_HOME || resolve(runtime, 'openshorts'));
   const env = { ...process.env, ...saved,
     GCLOUD_PROJECT: project, GOOGLE_CLOUD_PROJECT: project,
     FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099', FIRESTORE_EMULATOR_HOST: '127.0.0.1:8080',

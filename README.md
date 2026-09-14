@@ -15,7 +15,7 @@ npm run dev
 
 Open [the owner app](http://127.0.0.1:4311/) and [Firebase Emulator UI](http://127.0.0.1:4000/). Sign in with a fictional phone number, such as `(415) 555-0198`; the verification code appears in the local Auth emulator. No real SMS is sent. The app uses real emulator accounts, database records and private media, not the UI's sample-data mode.
 
-The setup creates ignored local configuration and backend secrets in `.runtime/`, plus public `owner-app/.env.local`. OpenShorts and its virtual environment live under `.runtime/openshorts`. To reuse an existing pinned installation, set `OPENSHORTS_HOME` before running the launcher. The launcher never enables paid model calls or real messaging.
+The setup creates ignored local configuration and backend secrets in `.runtime/`, plus public `owner-app/.env.local`. OpenShorts and its virtual environment live under `.runtime/openshorts`. To reuse an existing pinned installation, set `OPENSHORTS_HOME` before running the launcher; the local setup remembers that path for future starts and smoke tests. The launcher never enables paid model calls or real messaging.
 
 `npm run dev -- --no-worker` starts the API and owner website while keeping the queue available for the integration test. If the emulators are already running, they are reused. Ctrl+C stops services started by that launcher. Emulators started by the launcher export their state into `.runtime/firebase-data` on exit and import it on the next start.
 
@@ -23,7 +23,7 @@ The setup creates ignored local configuration and backend secrets in `.runtime/`
 
 ```sh
 npm run dev -- --no-worker
-# In another terminal, with the same OPENSHORTS_HOME if customized:
+# In another terminal:
 python3 scripts/smoke-e2e.py
 ```
 
