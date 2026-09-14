@@ -21,6 +21,21 @@ Output upload and input download use API-issued capabilities restricted to the A
 
 The test suite verifies selection bounds, rejected inputs, origin restrictions, stale work cancellation and completion retry without re-rendering. Root `scripts/smoke-e2e.py` exercises the real Firebase emulator and renderer together.
 
+## CPU container
+
+The image pins OpenShorts at `5a6f42807576eda572673b32f8c7625cb6d82a3c` and preserves its upstream `LICENSE`. PyTorch `2.11.0` and torchvision `0.26.0` come from PyTorch's CPU wheel index, avoiding CUDA runtime packages while retaining upstream's versions. The build preloads `yolov8n.pt`, imports the rendering dependency chain, confirms CUDA is unavailable, and performs a decoded 9:16 `--skip-analysis` render from synthetic media.
+
+Build context must be `engine-worker/`; its `.dockerignore` excludes tests, local environments, logs, and credentials. For the pinned Google Artifact Registry image, run from the repository root:
+
+```sh
+gcloud builds submit engine-worker \
+  --project=lemekeru \
+  --region=us-central1 \
+  --config=deploy/worker-cloudbuild.yaml
+```
+
+No credentials are copied into the image. Supply the API endpoint and engine key only as runtime environment/secret values. `ENGINE_MODE` defaults to `local`, so model-backed analysis remains opt-in.
+
 ## Hosting
 
 Build this directory's Dockerfile and run it as a continuously running worker. On Google Cloud, a Cloud Run worker pool is appropriate; a request-driven Cloud Run service with idle CPU throttling is not sufficient for this polling loop. Configure one instance initially and mount secrets through Secret Manager. Do not package local job media or credentials in an image.

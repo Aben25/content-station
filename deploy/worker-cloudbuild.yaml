@@ -1,0 +1,14 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --pull
+      - --tag
+      - us-central1-docker.pkg.dev/lemekeru/contentstation/worker:20260914
+      - .
+images:
+  - us-central1-docker.pkg.dev/lemekeru/contentstation/worker:20260914
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+timeout: 3600s
