@@ -22,3 +22,9 @@ Also added the requested `FIRESTORE_DATABASE_ID` environment fallback, with an e
 - `npm --prefix firebase-api run build`: passed.
 
 Physical mobile native-share behavior remains a hardware/browser verification item; automated DOM tests and dependency-level gesture ordering do not claim an actual handset share sheet. No hosted deployment, production mutation, SMS, paid model call or external post was performed.
+
+## Settings truthfulness follow-up
+
+The design prototype explicitly limits full settings to later scope. Retained the same five summary rows, spacing, typography, colors and view-only scope. Settings now shows the actual business profile and saved clip schedule, summarizes saved recording hours only when present, and says when recording hours are unset. Removed unsupported blur, push notification, team-size and billing-date claims. Team and billing summaries clearly state their controls/details are unavailable; the footer now says “These settings are view-only.” No settings implementation or new notification service was introduced.
+
+The new rendered Settings regression failed first on the prototype's unsupported claims and then passed after these copy/data changes. It also verifies that absent recording hours do not turn into the formatting helper's fictional default schedule. Final owner checks: **15/15 tests passed across 6 files**, TypeScript passed, production build passed (128 modules). Backend code was unchanged in this follow-up.

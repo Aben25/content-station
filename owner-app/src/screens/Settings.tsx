@@ -6,13 +6,12 @@ import { S_SCROLL, st } from '../lib/style';
 export function Settings() {
   const { me } = useSession();
   const shop = me?.shop ?? null;
-  const deliveryHour = shop?.delivery_hour ?? product.deliveryHourLocal;
   const rows: [string, string][] = [
-    ['Business profile', shop ? `${shop.name}, ${typeLabel(shop.type)}` : ''],
-    ['Posting', `Clips at ${hourLabel(deliveryHour)} by text and push`],
-    ['Recording', `${hoursShort(shop?.hours)}. Face blur on.`],
-    ['Team', 'You and 1 staff'],
-    ['Billing', 'Next charge Oct 1'],
+    ['Business profile', shop ? `${shop.name}, ${typeLabel(shop.type)}` : 'Business profile is not available.'],
+    ['Posting', shop ? `Scheduled clip time: ${hourLabel(shop.delivery_hour)}` : 'Clip schedule is not available.'],
+    ['Recording', shop?.hours ? `Saved hours: ${hoursShort(shop.hours)}` : 'Recording hours are not set.'],
+    ['Team', 'Team management is not available yet.'],
+    ['Billing', 'Billing details are not available here.'],
   ];
   return (
     <div style={st(S_SCROLL)}>
@@ -30,7 +29,7 @@ export function Settings() {
           ))}
         </div>
         <div style={st('font-size:13px;color:#6F6B64;line-height:1.45;padding:0 4px')}>Raw footage is deleted after {product.rawRetentionHours} hours. Clips are kept until you delete them.</div>
-        <div style={st('font-size:12px;color:#B8B3AA;padding:0 4px')}>Full settings are P1.</div>
+        <div style={st('font-size:12px;color:#B8B3AA;padding:0 4px')}>These settings are view-only.</div>
       </div>
     </div>
   );
