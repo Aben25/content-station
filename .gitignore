@@ -12,4 +12,9 @@ wall-app/*.xcodeproj/project.xcworkspace/xcuserdata/
 wall-app/build/
 wall-app/DerivedData/
 .build/
+.runtime/
+__pycache__/
+.venv/
+.firebase/
+*-debug.log
 wall-app/build-device/

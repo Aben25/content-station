@@ -1,5 +1,7 @@
 # ContentStation shared contract
 
+> Historical v2 Supabase contract. The active implementation now uses Firebase. Read [FIREBASE-CONTRACT.md](FIREBASE-CONTRACT.md) first for authentication, job leases, media capabilities and the saved-frame revision. Owner/device field shapes below remain a useful reference; Supabase setup, SQL tables, implicit mock mode and the old unleased engine routes are not the active backend.
+
 Read this before touching any of the three pieces. `docs/handoff/HANDOFF.md` owns behavior and architecture. The design files own visuals and copy. This file pins the seams between the wall app, the owner app, and the backend so the three can be built in parallel. Changes here need a matching change in every consumer.
 
 No em dashes anywhere in code, copy, comments, or docs.
