@@ -110,7 +110,7 @@ export function Hours() {
       <div style={st('display:flex;flex-direction:column;gap:8px;padding:16px;border-radius:14px;background:#F1EFEA')}>
         <div style={st('font-weight:600;font-size:15px')}>Good to know</div>
         <div style={st('font-size:15px;color:#3F3C37;line-height:1.45')}>
-          The camera records only during these hours. Faces of anyone who isn't staff are blurred. Pause any time from the Camera tab, two taps. Raw footage is deleted after {product.rawRetentionHours} hours.
+          The camera records only during these hours. Check clips for people and private details before sharing. Pause any time from the Camera tab, two taps. Raw footage is deleted after {product.rawRetentionHours} hours.
         </div>
       </div>
       <Button onClick={use} disabled={busy}>

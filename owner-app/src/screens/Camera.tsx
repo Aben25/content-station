@@ -150,7 +150,7 @@ export function Camera() {
           </button>
         </div>
         <div style={st('font-size:13px;color:#6F6B64;line-height:1.45;padding:0 4px')}>
-          This camera films the work at {workstation}. Faces of anyone who isn't staff are blurred. Raw footage is deleted after {product.rawRetentionHours} hours.
+          This camera films the work at {workstation}. Check clips for people and private details before sharing. Raw footage is deleted after {product.rawRetentionHours} hours.
         </div>
       </div>
 
