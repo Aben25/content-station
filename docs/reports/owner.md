@@ -2,7 +2,7 @@
 
 ## Result
 
-The supplied owner prototype remains the visual source. Its Supabase client was replaced with Firebase phone authentication and bearer-authenticated requests to `VITE_API_BASE_URL` (the local integration API uses `http://127.0.0.1:4310`). Firebase restores persisted sessions, renews ID tokens through `getIdToken`, force-refreshes and retries once after an API 401, uses invisible reCAPTCHA for phone OTP, and optionally connects Auth to `VITE_FIREBASE_AUTH_EMULATOR_URL`.
+The supplied owner prototype remains the visual source. Its Supabase client was replaced with Firebase phone authentication and bearer-authenticated requests to `VITE_API_BASE_URL` (the local integration API uses `http://127.0.0.1:4310`). Firebase restores persisted sessions, renews ID tokens through `getIdToken`, force-refreshes and retries once after an API 401, uses invisible reCAPTCHA for phone OTP, and optionally connects Auth to `VITE_FIREBASE_AUTH_EMULATOR_URL`. The default browser `fetch` is wrapped before it is stored so requests are not invoked with the `FirebaseApi` instance as their receiver.
 
 Demo data now requires the exact setting `VITE_DEMO_MODE=true` and displays a persistent **DEMO DATA** label. Missing real configuration renders a setup page naming the missing settings instead of entering the mock.
 
@@ -23,7 +23,7 @@ The local Auth emulator does not require a real SMS delivery or reCAPTCHA challe
 
 ## Verification
 
-- `npm test`: 9 focused tests passed (configuration selection, renewed auth token/request behavior including the 401 retry, delete failures, successful versus fallback sharing, and blob downloads).
+- `npm test`: 10 focused tests passed (configuration selection, renewed auth token/request behavior including the 401 retry, browser fetch receiver behavior, delete failures, successful versus fallback sharing, and blob downloads).
 - `npm run build`: production bundle built successfully.
 - `npm run typecheck`: TypeScript completed without errors.
 

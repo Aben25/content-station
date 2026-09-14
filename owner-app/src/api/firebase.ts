@@ -5,7 +5,10 @@ type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 export interface AuthUserAdapter { uid: string; phoneNumber: string | null; getIdToken(forceRefresh?: boolean): Promise<string>; }
 export interface AuthAdapter { readonly currentUser: AuthUserAdapter | null; waitUntilReady(): Promise<void>; sendOtp(phone: string): Promise<void>; verifyOtp(code: string): Promise<AuthUserAdapter>; signOut(): Promise<void>; }
 export class FirebaseApi implements Api {
-  constructor(private auth: AuthAdapter, private base: string, private fetcher: typeof fetch = fetch) {}
+  private fetcher: typeof fetch;
+  constructor(private auth: AuthAdapter, private base: string, fetcher?: typeof fetch) {
+    this.fetcher = fetcher ?? ((input, init) => fetch(input, init));
+  }
   sendOtp(phone: string) { return this.auth.sendOtp(normalizePhone(phone)); }
   async verifyOtp(_phone: string, code: string): Promise<Session> { return this.session(await this.auth.verifyOtp(code)); }
   signOut() { return this.auth.signOut(); }

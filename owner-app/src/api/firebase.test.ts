@@ -32,4 +32,18 @@ describe('FirebaseApi requests', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch.mock.calls[1]?.[1]).toMatchObject({ headers: expect.objectContaining({ Authorization: 'Bearer renewed-token' }) });
   });
+
+  it('calls the browser fetch function without using the API instance as its receiver', async () => {
+    const browserFetch = vi.fn(function (this: unknown) {
+      if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(new Response(JSON.stringify({ user: {}, shop: null, device: null, onboarding_step: 'shop' }), { status: 200 }));
+    });
+    vi.stubGlobal('fetch', browserFetch);
+    try {
+      await new FirebaseApi(auth(), 'http://127.0.0.1:4310').me();
+      expect(browserFetch).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
