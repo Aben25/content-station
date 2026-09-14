@@ -53,7 +53,7 @@ export function Home() {
 
   const skip = (clip: Clip) => {
     setData((d) => (d ? { ...d, clips: d.clips.filter((c) => c.id !== clip.id) } : d));
-    toast("Skipped. We'll show fewer like this.");
+    toast("Skipped.");
     api.clipEvent(clip.id, 'skip').catch(() => undefined);
   };
 

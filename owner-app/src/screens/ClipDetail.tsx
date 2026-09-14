@@ -111,7 +111,7 @@ export function ClipDetail({ id }: { id: string }) {
     setBusy(true);
     await api.clipEvent(clip.id, 'skip').catch(() => undefined);
     navigate(R.home);
-    toast("Skipped. We'll show fewer like this.");
+    toast("Skipped.");
   };
 
   const confirmDelete = async () => {
@@ -131,10 +131,11 @@ export function ClipDetail({ id }: { id: string }) {
   const report = async (code: string) => {
     if (!clip || busy) return;
     setBusy(true);
-    await api.clipEvent(clip.id, 'report', code).catch(() => undefined);
+    try { await api.clipEvent(clip.id, 'report', code); }
+    catch (err) { setBusy(false); toast(errorMessage(err, "Couldn't save the report. Try again.")); return; }
     setSheet(null);
     navigate(R.home);
-    toast("Thanks. We'll take a look.");
+    toast("Report saved.");
   };
 
   const stripe = clip ? stripeFor(clip.id) : undefined;
