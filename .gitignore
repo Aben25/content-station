@@ -12,3 +12,4 @@ wall-app/*.xcodeproj/project.xcworkspace/xcuserdata/
 wall-app/build/
 wall-app/DerivedData/
 .build/
+wall-app/build-device/
