@@ -1,0 +1,162 @@
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '../api/index';
+import { errorMessage, type CameraStatus, type Clip, type ClipsResponse } from '../api/types';
+import { Button } from '../components/Button';
+import { ClipCard } from '../components/ClipCard';
+import { StatusDot } from '../components/StatusDot';
+import { StripedPanel } from '../components/StripedPanel';
+import { useShopTimezone } from '../hooks/useSession';
+import { useToast } from '../hooks/useToast';
+import { dayTitle, dayWord, spanLabel, timeOfDay, todayKey } from '../lib/format';
+import { shareClip } from '../lib/share';
+import { deliveryLabel, statusView } from '../lib/status';
+import { S_ERROR, S_SCROLL, STRIPES, st } from '../lib/style';
+import { R, navigate } from '../router';
+
+const OLDER_ROW = 'display:flex;align-items:center;justify-content:space-between;padding:12px 0 8px;border-top:1px solid rgba(23,22,20,.08);width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left';
+
+export function Home() {
+  const tz = useShopTimezone();
+  const toast = useToast();
+  const [date, setDate] = useState<string | undefined>(undefined);
+  const [data, setData] = useState<ClipsResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<CameraStatus | null>(null);
+  const [statusKnown, setStatusKnown] = useState(false);
+
+  const load = useCallback(async (d?: string) => {
+    try {
+      setData(await api.clips(d));
+      setError(null);
+    } catch (err) {
+      setError(errorMessage(err, "Couldn't load your clips. Check your connection and try again."));
+    }
+  }, []);
+
+  useEffect(() => {
+    void load(date);
+  }, [date, load]);
+
+  useEffect(() => {
+    let live = true;
+    api
+      .cameraStatus()
+      .then((s) => {
+        if (!live) return;
+        setStatus(s);
+        setStatusKnown(true);
+      })
+      .catch(() => {
+        if (live) setStatusKnown(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const now = new Date();
+  const view = status ? statusView(status, now) : null;
+  const isToday = !date || data?.date === todayKey(tz, now);
+  const title = data && !isToday ? dayTitle(data.date, tz, now) : 'Today';
+  const clips = data?.clips ?? [];
+
+  const skip = (clip: Clip) => {
+    setData((d) => (d ? { ...d, clips: d.clips.filter((c) => c.id !== clip.id) } : d));
+    toast("Skipped. We'll show fewer like this.");
+    api.clipEvent(clip.id, 'skip').catch(() => undefined);
+  };
+
+  const share = async (clip: Clip) => {
+    const result = await shareClip(clip);
+    if (result === 'unavailable') toast('Share sheet opens: Instagram, TikTok, Save');
+    if (result !== 'cancelled') api.clipEvent(clip.id, 'share').catch(() => undefined);
+  };
+
+  // Empty state copy. Recorded time comes from the status when the camera is recording,
+  // the prototype sentence stands in when the status could not be loaded at all.
+  const seenAt = status?.last_seen_at ? timeOfDay(status.last_seen_at, tz) : null;
+  let recorded: string | null = 'The camera has recorded 2 hours so far.';
+  if (statusKnown && status) {
+    if (status.status === 'recording' && status.status_since) {
+      const end = status.last_seen_at ? Date.parse(status.last_seen_at) : now.getTime();
+      recorded = `The camera has recorded ${spanLabel(end - Date.parse(status.status_since))} so far.`;
+    } else {
+      recorded = null;
+    }
+  }
+
+  return (
+    <div style={st(S_SCROLL)}>
+      <div style={st('padding:var(--top-list) 20px 12px;display:flex;flex-direction:column;gap:6px')}>
+        {!isToday && (
+          <Button variant="back" onClick={() => setDate(undefined)} style={{ alignSelf: 'flex-start' }}>
+            Back
+          </Button>
+        )}
+        <div style={st('font-size:28px;font-weight:600;line-height:1.1')}>{title}</div>
+        <button onClick={() => navigate(R.camera)} style={st('display:flex;align-items:center;gap:8px;background:none;border:0;padding:0;font-size:15px;color:#6F6B64;text-align:left;min-height:20px')}>
+          {view && (
+            <>
+              <StatusDot color={view.color} size={9} />
+              {view.short}
+            </>
+          )}
+        </button>
+      </div>
+
+      {error && !data && <div style={{ ...st(S_ERROR), padding: '8px 20px' }}>{error}</div>}
+
+      {data && clips.length === 0 && (
+        <div style={st('padding:8px 20px 24px;display:flex;flex-direction:column;gap:14px')}>
+          <div style={{ ...st('aspect-ratio:9/12;border-radius:20px;position:relative;display:flex;align-items:flex-end;padding:18px;box-sizing:border-box;overflow:hidden'), background: STRIPES[0] }}>
+            {status?.last_thumb_url ? (
+              <img src={status.last_thumb_url} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <StripedPanel stripe={STRIPES[0]} label={`still: what the camera saw${seenAt ? ` at ${seenAt}` : ''}`} labelPadding="0 24px" />
+            )}
+            {status?.last_seen_at && (
+              <div style={st('color:#F2EFE9;font-size:14px;background:rgba(0,0,0,.45);padding:6px 10px;border-radius:8px;position:relative')}>
+                Seen {dayWord(status.last_seen_at, tz, now)}, {seenAt}
+              </div>
+            )}
+          </div>
+          <div style={st('font-size:20px;font-weight:600')}>No clips yet</div>
+          <div style={st('color:#6F6B64;font-size:16px;line-height:1.45;text-wrap:pretty')}>
+            {recorded ? `${recorded} ` : ''}Clips arrive {deliveryLabel(status, now)}, once there's a full day to pick from.
+          </div>
+        </div>
+      )}
+
+      {data && clips.length > 0 && (
+        <div style={st('padding:8px 20px 24px;display:flex;flex-direction:column;gap:28px')}>
+          {clips.map((clip) => (
+            <ClipCard key={clip.id} clip={clip} onOpen={() => navigate(R.clip(clip.id))} onShare={() => void share(clip)} onSkip={() => skip(clip)} />
+          ))}
+          <OlderRows older={data.older} tz={tz} now={now} onPick={setDate} />
+        </div>
+      )}
+
+      {data && clips.length === 0 && data.older.length > 0 && (
+        <div style={st('padding:0 20px 24px;display:flex;flex-direction:column')}>
+          <OlderRows older={data.older} tz={tz} now={now} onPick={setDate} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// "Yesterday, 2 clips" rows. Tapping one loads that date.
+function OlderRows({ older, tz, now, onPick }: { older: ClipsResponse['older']; tz: string; now: Date; onPick: (date: string) => void }) {
+  return (
+    <>
+      {older.map((o) => (
+        <button key={o.date} onClick={() => onPick(o.date)} style={st(OLDER_ROW)}>
+          <div style={st('color:#6F6B64;font-size:15px')}>{dayTitle(o.date, tz, now)}</div>
+          <div style={st('font-size:15px;font-weight:500')}>
+            {o.count} {o.count === 1 ? 'clip' : 'clips'}
+          </div>
+        </button>
+      ))}
+    </>
+  );
+}

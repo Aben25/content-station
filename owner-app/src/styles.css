@@ -1,0 +1,74 @@
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  /* The prototype fakes an iPhone status bar (59px) and home indicator (34px) with fixed paddings.
+     The real app derives the same spacing from the safe area insets. */
+  --top-hero: calc(var(--sat) + 61px);   /* prototype 120px */
+  --top-page: calc(var(--sat) + 11px);   /* prototype 70px */
+  --top-list: calc(var(--sat) + 7px);    /* prototype 66px */
+  --bottom-page: max(40px, calc(var(--sab) + 6px));  /* prototype 40px */
+  --bottom-dark: max(44px, calc(var(--sab) + 10px)); /* prototype 44px */
+  --bottom-nav: max(28px, var(--sab));               /* prototype 28px */
+  --sheet-inset: calc(8px + var(--sab));
+  --toast-top: calc(var(--sat) + 12px);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #F7F6F3;
+  color: #171614;
+}
+
+body {
+  font: 17px/1.35 Outfit, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+#root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: #F7F6F3;
+  color: #171614;
+}
+
+input {
+  outline: none;
+  font-family: Outfit, system-ui, sans-serif;
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+}
+
+input::placeholder {
+  color: #B8B3AA;
+}
+
+button {
+  cursor: pointer;
+  font-family: Outfit, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+video, img, canvas {
+  display: block;
+}
+
+@keyframes qrpulse {
+  0%, 100% { opacity: .4; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
