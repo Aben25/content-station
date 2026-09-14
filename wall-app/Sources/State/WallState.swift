@@ -99,7 +99,7 @@ struct StateCopy: Equatable {
         case .fault:
             return StateCopy(
                 glyph: .fault,
-                line1: "Text us: \(Product.supportPhoneDisplay)",
+                line1: Product.supportPhoneDisplay.isEmpty ? "Restart the camera app" : "Text us: \(Product.supportPhoneDisplay)",
                 line2: "Code \(context.faultCode)",
                 code: ""
             )

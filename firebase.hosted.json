@@ -1,0 +1,17 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": [{
+    "bucket": "lemekeru-content-station",
+    "rules": "storage.rules"
+  }],
+  "hosting": {
+    "site": "lemekeru",
+    "public": "owner-app/dist",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{"source": "**", "destination": "/index.html"}],
+    "headers": [{"source": "/index.html", "headers": [{"key": "Cache-Control", "value": "no-cache"}]}]
+  }
+}

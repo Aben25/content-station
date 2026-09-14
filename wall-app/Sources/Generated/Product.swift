@@ -4,11 +4,11 @@ enum Product {
     static let name = "ContentStation"
     static let nameLower = "contentstation"
     static let tagline = "Your shop, filmed while you work."
-    static let supportPhoneDisplay = "(415) 555-0142"
-    static let supportPhoneE164 = "+14155550142"
-    static let startUrlDisplay = "cs.ai/start"
-    static let startUrl = "https://cs.ai/start"
-    static let ownerAppUrl = "https://cs.ai"
+    static let supportPhoneDisplay = ""
+    static let supportPhoneE164 = ""
+    static let startUrlDisplay = "lemekeru.web.app"
+    static let startUrl = "https://lemekeru.web.app/#/start"
+    static let ownerAppUrl = "https://lemekeru.web.app"
     static let deliveryHourLocal = 8
     static let rawRetentionHours = 48
     static let heartbeatSeconds = 60

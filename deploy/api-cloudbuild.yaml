@@ -1,0 +1,8 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: [build, -f, firebase-api/Dockerfile, -t, 'us-central1-docker.pkg.dev/$PROJECT_ID/contentstation/api:20260914', .]
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/contentstation/api:20260914'
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 1200s

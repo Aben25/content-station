@@ -111,7 +111,7 @@ export function statusView(cs: CameraStatus, now: Date = new Date()): StatusView
       return make(
         'attention',
         'Needs attention',
-        `The camera stopped${cs.status_code ? ` with code ${cs.status_code}` : ''}. Unplug it, plug it back in, or call ${product.supportPhoneDisplay}.`,
+        `The camera stopped${cs.status_code ? ` with code ${cs.status_code}` : ''}. Restart the camera app${product.supportPhoneDisplay ? ` or call ${product.supportPhoneDisplay}` : ''}.`,
         'Needs attention',
       );
     case 'idle': {
@@ -134,7 +134,7 @@ export function statusView(cs: CameraStatus, now: Date = new Date()): StatusView
     case 'recording':
     default: {
       const since = timeOfDay(cs.status_since, tz);
-      return make('recording', `Recording since ${since}`, `Filming ${cs.workstation}. Clips arrive ${deliveryLabel(cs, now)}.`, 'Recording');
+      return make('recording', `Recording since ${since}`, `Filming ${cs.workstation}. Check Clips after footage is processed.`, 'Recording');
     }
   }
 }

@@ -1,4 +1,6 @@
-import Fastify, { type FastifyRequest } from "fastify";
+import Fastify, { type FastifyRequest as Request, type FastifyInstance } from "fastify";
+import type { Server } from "node:http";
+import type { Http2Server } from "node:http2";
 import cors from "@fastify/cors";
 import { initializeApp, getApps, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -25,6 +27,7 @@ const DEFAULT_HOURS = Object.fromEntries(
   ]),
 );
 type Row = Record<string, any>;
+type FastifyRequest = Pick<Request, "headers" | "body" | "params" | "query">;
 type Options = {
   admin?: App;
   databaseId?: string;
@@ -172,12 +175,19 @@ export async function buildApp(options: Options = {}) {
     process.env.API_BASE_URL ||
     "http://127.0.0.1:4310"
   ).replace(/\/$/, "");
-  const app = Fastify({
+  const serverOptions = {
     logger: false,
     bodyLimit: 1048576,
     requestTimeout: 300000,
     routerOptions: { maxParamLength: 4096 },
-  });
+  };
+  // Cloud Run needs an HTTP/2 backend for camera uploads larger than 32 MiB.
+  // TLS terminates at Cloud Run; local development keeps its HTTP/1 listener.
+  // Widen Fastify's protocol-specific overloads at the construction boundary;
+  // all routes below use request/response members shared by both protocols.
+  const app = (process.env.API_HTTP2 === "true"
+    ? Fastify({ ...serverOptions, http2: true })
+    : Fastify(serverOptions)) as FastifyInstance<Server | Http2Server>;
   await app.register(cors, {
     origin: process.env.OWNER_ORIGIN?.split(",") || [
       "http://127.0.0.1:5173",

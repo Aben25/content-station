@@ -42,7 +42,7 @@ The test refuses to run against a hosted project. It simulates the camera's HTTP
 
 Set `CS_API_BASE_URL` to the API origin before building the wall app. It adds no Supabase route suffix and needs no anon key. For the simulator, `http://127.0.0.1:4310` reaches the local API. A physical iPhone needs a reachable backend address; its own localhost is not the Mac. Debug builds allow local networking, while Release builds retain normal HTTPS requirements.
 
-The provided TestFlight build 7 predates this integration. Building this branch locally does not update an installed TestFlight app. A new signed build using the hosted API is a separate release step.
+The camera release configuration now uses the hosted HTTPS API. Build 9 also replaces the original placeholder setup domain with `lemekeru.web.app`. Check [hosted verification](docs/reports/hosted-verification.md) for TestFlight and hardware-test status.
 
 ## What the engine does today
 
@@ -52,6 +52,6 @@ No automatic social posting or approval queue is included. Owner sharing/export 
 
 ## Hosting
 
-See [the hosted setup checklist](docs/HOSTED-SETUP.md) and [the implementation and verification reports](docs/reports/). Use a selected Firebase project, a dedicated v2 storage bucket and narrowly scoped access. The local setup does not deploy rules, create cloud resources, send messages, update TestFlight or replace the older Firebase system.
+The owner app is deployed at [lemekeru.web.app](https://lemekeru.web.app), with a Cloud Run API and OpenShorts worker in the same Google project. The old nonfunctional Content Station configuration was replaced with the owner's authorization. See [the hosted setup](docs/HOSTED-SETUP.md) and [verification reports](docs/reports/). Running the local setup still does not deploy cloud resources or send messages.
 
-Product names, support phone and URLs live in `product.json`; `scripts/sync-product.sh` propagates them. Replace the placeholder support contact and `cs.ai` links with your real values before a customer release.
+Product names, optional support phone and URLs live in `product.json`; `scripts/sync-product.sh` propagates them. Setup links now point to the deployed owner website, and no fictional support number is displayed. Daily clip texts and automatic face blurring are not enabled.
