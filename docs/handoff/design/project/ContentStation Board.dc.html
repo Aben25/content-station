@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet"><style>body{margin:0;background:#ECEAE5;font-family:Outfit,system-ui,sans-serif;color:#171614}a{color:#171614}a:hover{color:#E08A2E}</style></helmet>
+
+<section id="context" style="padding:48px 56px 40px;border-bottom:1px solid rgba(23,22,20,.08);display:flex;flex-direction:column;gap:20px;max-width:1100px">
+  <div style="font-size:13px;font-weight:600;letter-spacing:.08em;color:#E08A2E">CONTENTSTATION.AI, P0 DESIGN PASS 1</div>
+  <div style="font-size:40px;font-weight:600;line-height:1.05;text-wrap:balance">Wall app states, onboarding, Home, Clip detail, Camera</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:28px;font-size:15px;line-height:1.5;color:#3F3C37">
+    <div><div style="font-weight:600;color:#171614;margin-bottom:6px">Direction</div>Quiet utility. Warm off-white, near-black ink, one amber accent used only for recording state and the primary action on dark screens. Outfit for everything. Footage is the UI; chrome stays thin.</div>
+    <div><div style="font-weight:600;color:#171614;margin-bottom:6px">Assumptions</div>Sample shop is a barbershop, Fade Society, chair 1. Placeholder striped panels stand in for footage and the QR illustration. Wall phone shows nothing to customers but the amber edge glow. Numbers, names, and times are fictional.</div>
+    <div><div style="font-weight:600;color:#171614;margin-bottom:6px">How to use this</div>Every phone below is live. Tap through the owner app in any frame, or open <a href="Owner App.dc.html">Owner App</a> alone for the full prototype and <a href="Wall App.dc.html">Wall App</a> for the state switcher. Pause is two taps from anywhere: Camera tab, then Pause.</div>
+  </div>
+</section>
+
+<section id="wall" style="padding:40px 56px;border-bottom:1px solid rgba(23,22,20,.08);display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;align-items:baseline;gap:14px"><div style="font-size:24px;font-weight:600">1. Wall app, all states</div><div style="font-size:14px;color:#6F6B64">iPhone 12, 390 by 844. Dark background, 44px line one, legible at 8 ft and minimum brightness. No touch targets.</div></div>
+  <div style="zoom:.5;display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+    <sc-for list="{{ wallStates }}" as="w" hint-placeholder-count="11">
+      <div style="display:flex;flex-direction:column;gap:14px;width:390px"><dc-import name="Wall App" state="{{ w.id }}" hint-size="390px,844px"></dc-import><div style="font-size:26px;font-weight:600">{{ w.name }}</div><div style="font-size:22px;color:#6F6B64;line-height:1.4">{{ w.note }}</div></div>
+    </sc-for>
+  </div>
+  <div style="display:flex;gap:24px;align-items:flex-start;padding:20px;background:#fff;border-radius:16px;max-width:900px"><div style="width:60px;height:110px;border-radius:12px;background:#000;box-shadow:inset 0 0 14px 3px rgba(224,138,46,.7);flex:none"></div><div style="font-size:15px;line-height:1.5;color:#3F3C37"><div style="font-weight:600;color:#171614">Recording indicator</div>A steady warm amber glow along the screen edge, plus a 14px dot. Amber, not red, so it never reads as a security camera. The glow is the only thing a customer sees; the screen itself stays black. Every other state is also mirrored in the owner app and as a notification, since the wall screen may face the ceiling.</div></div>
+</section>
+
+<section id="onboarding" style="padding:40px 56px;border-bottom:1px solid rgba(23,22,20,.08);display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;align-items:baseline;gap:14px"><div style="font-size:24px;font-weight:600">2. Onboarding, box open to first frame</div><div style="font-size:14px;color:#6F6B64">Target under five minutes. The wall phone is never touched after mounting. Back is always available.</div></div>
+  <div style="zoom:.6;display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:14px;width:393px">
+      <div style="width:393px;height:852px;display:flex;align-items:center;justify-content:center"><div style="width:380px;height:266px;background:#F7F6F3;border-radius:6px;box-shadow:0 20px 50px rgba(0,0,0,.18),0 0 0 1px rgba(0,0,0,.06);padding:30px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between"><div style="font-size:12px;font-weight:600;letter-spacing:.08em;color:#E08A2E">CONTENTSTATION</div><div style="font-size:30px;font-weight:600;line-height:1.15;text-wrap:balance">Mount it.<br>Plug it in.<br>Text START to (415) 555-0142.</div><div style="font-size:13px;color:#6F6B64">That's the whole setup. We'll text you a link. Takes about five minutes.</div></div></div>
+      <div style="font-size:26px;font-weight:600">Step 0, card in the box</div><div style="font-size:22px;color:#6F6B64;line-height:1.4">5 by 3.5 in. Front only. The text reply carries the sign-in link.</div>
+    </div>
+    <sc-for list="{{ onboarding }}" as="o" hint-placeholder-count="8">
+      <div style="display:flex;flex-direction:column;gap:14px;width:393px"><dc-import name="Owner App" screen="{{ o.id }}" hint-size="393px,852px"></dc-import><div style="font-size:26px;font-weight:600">{{ o.name }}</div><div style="font-size:22px;color:#6F6B64;line-height:1.4">{{ o.note }}</div></div>
+    </sc-for>
+  </div>
+</section>
+
+<section id="home" style="padding:40px 56px;border-bottom:1px solid rgba(23,22,20,.08);display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;align-items:baseline;gap:14px"><div style="font-size:24px;font-weight:600">3. Home and Clip detail</div><div style="font-size:14px;color:#6F6B64">Opened from the morning notification. Clips first, one column, Share and Skip under every card.</div></div>
+  <div style="zoom:.6;display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+    <sc-for list="{{ homeScreens }}" as="o" hint-placeholder-count="4">
+      <div style="display:flex;flex-direction:column;gap:14px;width:393px"><dc-import name="Owner App" screen="{{ o.id }}" empty-home="{{ o.empty }}" sheet="{{ o.sheet }}" hint-size="393px,852px"></dc-import><div style="font-size:26px;font-weight:600">{{ o.name }}</div><div style="font-size:22px;color:#6F6B64;line-height:1.4">{{ o.note }}</div></div>
+    </sc-for>
+  </div>
+</section>
+
+<section id="camera" style="padding:40px 56px;border-bottom:1px solid rgba(23,22,20,.08);display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;align-items:baseline;gap:14px"><div style="font-size:24px;font-weight:600">4. Camera</div><div style="font-size:14px;color:#6F6B64">Status card first, then four actions. Pause is reachable in two taps from anywhere.</div></div>
+  <div style="zoom:.6;display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+    <sc-for list="{{ cameraScreens }}" as="o" hint-placeholder-count="7">
+      <div style="display:flex;flex-direction:column;gap:14px;width:393px"><dc-import name="Owner App" screen="{{ o.id }}" camera-state="{{ o.cam }}" sheet="{{ o.sheet }}" hint-size="393px,852px"></dc-import><div style="font-size:26px;font-weight:600">{{ o.name }}</div><div style="font-size:22px;color:#6F6B64;line-height:1.4">{{ o.note }}</div></div>
+    </sc-for>
+  </div>
+</section>
+
+<section id="next" style="padding:40px 56px 64px;display:flex;flex-direction:column;gap:12px;max-width:900px">
+  <div style="font-size:24px;font-weight:600">Next</div>
+  <div style="font-size:15px;line-height:1.6;color:#3F3C37">Not yet designed from P0: lock-screen notification mockups, the printable recording sign, and the four flow diagrams. Open for your call: whether the Skip button belongs on the Home card or only in Clip detail, and whether staff can delete clips. Footage panels are placeholders until real clips exist.</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      wallStates: [
+        ['waiting','Waiting for setup','Short code doubles as the glyph. Exits when the QR is read.'],
+        ['reading','Reading QR','Solid amber disc. Tells the owner to lower the phone.'],
+        ['connecting','Connecting','Real progress bar with the network name. Never a bare spinner.'],
+        ['framing','Framing','Live preview and guide box. The owner watches on their own phone.'],
+        ['recording','Recording','Black screen, amber edge glow, one dot. This is all a customer sees.'],
+        ['paused','Paused','Resume time in plain words.'],
+        ['nointernet','No internet, 2 min','Dashed ring. Footage is safe on the phone.'],
+        ['nointernet_long','No internet, 10 min','Escalates to the re-scan instruction.'],
+        ['reframe','Re-frame needed','Tilted frame glyph. Sends the owner to their phone.'],
+        ['hot','Too hot','Cooling down. No numbers.'],
+        ['fault','Fault','Our number and an error code. Manual exit.'],
+      ].map(([id, name, note]) => ({ id, name, note })),
+      onboarding: [
+        ['signin','Step 1, sign in','Phone number only.'],
+        ['code','Step 1b, code','Six digits, auto-advances on the last one.'],
+        ['shop','Step 2, your shop','Three fields max. Type drives the framing guide.'],
+        ['wifi','Step 3, Wi-Fi','Network pre-filled when the browser allows. Password reveal.'],
+        ['qr','Step 4, show the camera','Live status below the QR. Advances by itself, no tap.'],
+        ['frame','Step 5, frame the shot','Barbershop guide. One button.'],
+        ['hours','Step 6, recording hours','Hours from Google, plus the consent moment.'],
+        ['done','Step 7, done','Preview of tomorrow\'s notification.'],
+      ].map(([id, name, note]) => ({ id, name, note })),
+      homeScreens: [
+        { id: 'home', empty: false, sheet: '', name: 'Home, today\'s clips', note: 'Status line under the date links to Camera. Autoplay muted on scroll.' },
+        { id: 'home', empty: true, sheet: '', name: 'Home, empty', note: 'A still of what the camera saw, and when clips are expected. Never blank.' },
+        { id: 'clip', empty: false, sheet: '', name: 'Clip detail', note: 'Sound on. Caption editable in place. Nothing else.' },
+        { id: 'clip', empty: false, sheet: 'delete', name: 'Delete forever', note: 'Says exactly what goes: the clip and its source footage.' },
+      ],
+      cameraScreens: [
+        { id: 'camera', cam: 'recording', sheet: '', name: 'Status, recording', note: 'Green. Last frame, Wi-Fi, temperature as a word, last seen, hours.' },
+        { id: 'camera', cam: 'offline', sheet: '', name: 'Status, no internet', note: 'Yellow. Points to re-scan if Wi-Fi changed.' },
+        { id: 'camera', cam: 'attention', sheet: '', name: 'Status, needs attention', note: 'Red. Camera moved, check the shot.' },
+        { id: 'camera', cam: 'recording', sheet: 'pause', name: 'Pause sheet', note: 'Each option shows exactly when recording resumes.' },
+        { id: 'camera', cam: 'paused', sheet: '', name: 'Status, paused', note: 'Resume now is right in the card.' },
+        { id: 'rescan', cam: 'recording', sheet: '', name: 'Re-scan QR', note: 'One line on when to use it. Re-runs Wi-Fi and QR only.' },
+        { id: 'replace', cam: 'recording', sheet: '', name: 'Replace camera', note: 'Three steps. Framing and hours carry over.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

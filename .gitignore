@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+supabase/.temp/
+supabase/.branches/
+wall-app/*.xcodeproj/xcuserdata/
+wall-app/*.xcodeproj/project.xcworkspace/xcuserdata/
+wall-app/build/
+wall-app/DerivedData/
+.build/

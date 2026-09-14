@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet"><style>@keyframes wallpulse{0%,100%{opacity:.55}50%{opacity:1}}@keyframes wallbar{0%{width:12%}100%{width:78%}}</style></helmet>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="390px" height="844px" dark="{{ true }}" hint-size="390px,844px">
+<div style="position:relative;width:100%;height:100%;background:#000;color:#F2EFE9;font-family:Outfit,system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 32px;box-sizing:border-box;overflow:hidden">
+  <sc-if value="{{ isFraming }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(135deg,#1a1917 0 14px,#151412 14px 28px)"></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:500 13px ui-monospace,Menlo,monospace;color:rgba(242,239,233,.35);letter-spacing:.04em">live preview: chair 1, mirror, station</div>
+    <div style="position:absolute;left:36px;right:36px;top:200px;bottom:250px;border:3px solid #E08A2E;border-radius:10px"></div>
+    <div style="position:absolute;left:0;right:0;bottom:120px;font-size:34px;font-weight:600;line-height:1.15">Adjust from your phone</div>
+  </sc-if>
+  <sc-if value="{{ isRecording }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;box-shadow:inset 0 0 48px 10px rgba(224,138,46,.6);pointer-events:none"></div>
+    <div style="position:absolute;left:0;right:0;bottom:60px;display:flex;justify-content:center"><div style="width:14px;height:14px;border-radius:50%;background:#E08A2E;box-shadow:0 0 24px 6px rgba(224,138,46,.7)"></div></div>
+  </sc-if>
+  <sc-if value="{{ isGeneric }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:44px;width:100%">
+      <sc-if value="{{ glyphCode }}" hint-placeholder-val="{{ false }}"><div style="font-size:112px;font-weight:700;letter-spacing:.12em;line-height:1;color:#E08A2E;font-variant-numeric:tabular-nums">{{ code }}</div></sc-if>
+      <sc-if value="{{ glyphDot }}" hint-placeholder-val="{{ false }}"><div style="width:120px;height:120px;border-radius:50%;background:#E08A2E"></div></sc-if>
+      <sc-if value="{{ glyphRing }}" hint-placeholder-val="{{ false }}"><div style="width:120px;height:120px;border-radius:50%;border:10px solid #E08A2E;animation:wallpulse 1.6s ease-in-out infinite"></div></sc-if>
+      <sc-if value="{{ glyphPause }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:26px"><div style="width:34px;height:120px;border-radius:8px;background:#F2EFE9"></div><div style="width:34px;height:120px;border-radius:8px;background:#F2EFE9"></div></div></sc-if>
+      <sc-if value="{{ glyphOff }}" hint-placeholder-val="{{ false }}"><div style="width:120px;height:120px;border-radius:50%;border:10px dashed #8E8A82;box-sizing:border-box"></div></sc-if>
+      <sc-if value="{{ glyphFrame }}" hint-placeholder-val="{{ false }}"><div style="width:130px;height:130px;border:10px solid #E08A2E;border-radius:14px;box-sizing:border-box;transform:rotate(9deg)"></div></sc-if>
+      <sc-if value="{{ glyphHot }}" hint-placeholder-val="{{ false }}"><div style="width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,#E08A2E 0 40%,transparent 41%),radial-gradient(circle,transparent 0 60%,rgba(224,138,46,.35) 61%)"></div></sc-if>
+      <sc-if value="{{ glyphFault }}" hint-placeholder-val="{{ false }}"><div style="width:120px;height:120px;border-radius:50%;border:10px solid #F2EFE9;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:72px;font-weight:700;line-height:1">!</div></sc-if>
+      <sc-if value="{{ glyphBar }}" hint-placeholder-val="{{ false }}"><div style="width:220px;height:14px;border-radius:7px;background:#2a2926;overflow:hidden"><div style="height:100%;background:#E08A2E;border-radius:7px;animation:wallbar 3s ease-out forwards"></div></div></sc-if>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div style="font-size:44px;font-weight:600;line-height:1.12;text-wrap:balance">{{ line1 }}</div>
+        <div style="font-size:28px;font-weight:400;line-height:1.3;color:#B8B3AA;text-wrap:balance">{{ line2 }}</div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:844},&quot;state&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;waiting&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;waiting&quot;,&quot;reading&quot;,&quot;connecting&quot;,&quot;framing&quot;,&quot;recording&quot;,&quot;paused&quot;,&quot;nointernet&quot;,&quot;nointernet_long&quot;,&quot;reframe&quot;,&quot;hot&quot;,&quot;fault&quot;]}}">
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.state ?? 'waiting';
+    const d = {
+      waiting:    { glyph: 'Code',  line1: 'Open cs.ai/start on your phone', line2: 'Then hold your phone up to the camera', code: '4KP7' },
+      reading:    { glyph: 'Dot',   line1: 'Got it.', line2: 'You can lower your phone' },
+      connecting: { glyph: 'Bar',   line1: 'Joining Fade Society Wi-Fi', line2: 'Then checking in with contentstation' },
+      framing:    { glyph: null },
+      recording:  { glyph: null },
+      paused:     { glyph: 'Pause', line1: 'Paused until 3:00 PM', line2: 'Resume from your phone' },
+      nointernet: { glyph: 'Off',   line1: 'No internet. Buffering.', line2: 'Footage is safe on this phone' },
+      nointernet_long: { glyph: 'Off', line1: 'Still no internet.', line2: 'Re-scan QR from your phone' },
+      reframe:    { glyph: 'Frame', line1: 'Camera moved.', line2: 'Check your phone' },
+      hot:        { glyph: 'Hot',   line1: 'Cooling down. Back soon.', line2: 'Footage is safe' },
+      fault:      { glyph: 'Fault', line1: 'Text us: (415) 555-0142', line2: 'Code E-31' },
+    }[s] || {};
+    const v = { isFraming: s === 'framing', isRecording: s === 'recording', isGeneric: s !== 'framing' && s !== 'recording', line1: d.line1 || '', line2: d.line2 || '', code: d.code || '' };
+    for (const g of ['Code','Dot','Ring','Pause','Off','Frame','Hot','Fault','Bar']) v['glyph' + g] = d.glyph === g;
+    return v;
+  }
+}
+</script>
+</body>
+</html>
