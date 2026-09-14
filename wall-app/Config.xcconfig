@@ -1,0 +1,5 @@
+// Build settings that end up in Info.plist. Fill these in for a real backend.
+// CS_API_BASE_URL is {SUPABASE_URL}/functions/v1/api. Escape the double slash
+// after the scheme as $()/ so xcconfig does not read it as a comment.
+CS_API_BASE_URL = https:/$()/YOUR-PROJECT.supabase.co/functions/v1/api
+CS_SUPABASE_ANON_KEY =
