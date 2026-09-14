@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 // Runs fn now and every intervalMs after the previous run settles.
 // The first run always happens so a screen opened in a background tab has data when it is shown.
 // Later runs pause while the tab is hidden and resume as soon as it is visible.
-export function usePolling(fn: () => Promise<void> | void, intervalMs: number, enabled = true): void {
+export function usePolling(fn: () => Promise<void> | void, intervalMs: number, enabled = true, resetKey?: unknown): void {
   const fnRef = useRef(fn);
   fnRef.current = fn;
   useEffect(() => {
@@ -30,5 +30,5 @@ export function usePolling(fn: () => Promise<void> | void, intervalMs: number, e
       window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [intervalMs, enabled]);
+  }, [intervalMs, enabled, resetKey]);
 }

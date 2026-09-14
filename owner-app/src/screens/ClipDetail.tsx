@@ -5,9 +5,10 @@ import { Button } from '../components/Button';
 import { placeholderLabel } from '../components/ClipCard';
 import { Sheet } from '../components/Sheet';
 import { StripedPanel } from '../components/StripedPanel';
+import { useClipShare } from '../hooks/useClipShare';
 import { useToast } from '../hooks/useToast';
 import { fmtDuration } from '../lib/format';
-import { downloadClip, shareClip } from '../lib/share';
+import { downloadClip } from '../lib/share';
 import { st, stripeFor } from '../lib/style';
 import { R, navigate, replace } from '../router';
 
@@ -19,6 +20,7 @@ const REASONS: { label: string; code: string }[] = [
 
 export function ClipDetail({ id }: { id: string }) {
   const toast = useToast();
+  const sharing = useClipShare();
   const [clip, setClip] = useState<Clip | null>(null);
   const [caption, setCaption] = useState('');
   const [sheet, setSheet] = useState<'delete' | 'report' | null>(null);
@@ -96,13 +98,6 @@ export function ClipDetail({ id }: { id: string }) {
 
   const onCaptionKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') e.currentTarget.blur();
-  };
-
-  const share = async () => {
-    if (!clip) return;
-    const result = await shareClip(clip);
-    if (result === 'unavailable') toast('Share sheet opens: Instagram, TikTok, Save');
-    if (result === 'shared') api.clipEvent(clip.id, 'share').catch(() => undefined);
   };
 
   const download = async () => {
@@ -200,8 +195,8 @@ export function ClipDetail({ id }: { id: string }) {
             style={st('height:48px;border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:0 14px;background:rgba(255,255,255,.06);color:#F2EFE9;font:400 16px Outfit,system-ui,sans-serif;width:100%')}
           />
         </div>
-        <Button variant="primaryAmber" onClick={() => void share()}>
-          Share
+        <Button variant="primaryAmber" onClick={() => clip && void sharing.share(clip)} disabled={!clip || sharing.busy}>
+          {sharing.label(id)}
         </Button>
         <div style={st('display:flex;gap:8px')}>
           <Button variant="ghostDark" onClick={() => void download()}>

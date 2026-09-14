@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { api } from '../api/index';
 import { errorMessage, type CameraStatus, type Clip, type ClipsResponse } from '../api/types';
 import { Button } from '../components/Button';
@@ -9,7 +9,7 @@ import { useShopTimezone } from '../hooks/useSession';
 import { useToast } from '../hooks/useToast';
 import { usePolling } from '../hooks/usePolling';
 import { dayTitle, dayWord, spanLabel, timeOfDay, todayKey } from '../lib/format';
-import { shareClip } from '../lib/share';
+import { useClipShare } from '../hooks/useClipShare';
 import { deliveryLabel, statusView } from '../lib/status';
 import { S_ERROR, S_SCROLL, STRIPES, st } from '../lib/style';
 import { R, navigate } from '../router';
@@ -18,41 +18,43 @@ const OLDER_ROW = 'display:flex;align-items:center;justify-content:space-between
 
 export function Home() {
   const tz = useShopTimezone();
+  const sharing = useClipShare();
   const toast = useToast();
   const [date, setDate] = useState<string | undefined>(undefined);
   const [data, setData] = useState<ClipsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<CameraStatus | null>(null);
 
+  const request = useRef(0);
+  const pickDate = (day?: string) => { request.current++; setData(null); setError(null); setDate(day); };
+
   const load = useCallback(async (d?: string) => {
+    const version = ++request.current;
     try {
-      setData(await api.clips(d));
+      const result = await api.clips(d);
+      if (version !== request.current) return;
+      setData(result);
       setError(null);
     } catch (err) {
+      if (version !== request.current) return;
       setError(errorMessage(err, "Couldn't load your clips. Check your connection and try again."));
     }
   }, []);
 
-  usePolling(() => load(date), 30_000);
+  usePolling(() => load(date), 30_000, true, date);
 
   usePolling(async () => { try { setStatus(await api.cameraStatus()); } catch { /* retain last truthful status */ } }, 30_000);
 
   const now = new Date();
   const view = status ? statusView(status, now) : null;
   const isToday = !date || data?.date === todayKey(tz, now);
-  const title = data && !isToday ? dayTitle(data.date, tz, now) : 'Today';
+  const title = date && !isToday ? dayTitle(date, tz, now) : 'Today';
   const clips = data?.clips ?? [];
 
   const skip = (clip: Clip) => {
     setData((d) => (d ? { ...d, clips: d.clips.filter((c) => c.id !== clip.id) } : d));
     toast("Skipped. We'll show fewer like this.");
     api.clipEvent(clip.id, 'skip').catch(() => undefined);
-  };
-
-  const share = async (clip: Clip) => {
-    const result = await shareClip(clip);
-    if (result === 'unavailable') toast('Share sheet opens: Instagram, TikTok, Save');
-    if (result === 'shared') api.clipEvent(clip.id, 'share').catch(() => undefined);
   };
 
   const seenAt = status?.last_seen_at ? timeOfDay(status.last_seen_at, tz) : null;
@@ -62,7 +64,7 @@ export function Home() {
     <div style={st(S_SCROLL)}>
       <div style={st('padding:var(--top-list) 20px 12px;display:flex;flex-direction:column;gap:6px')}>
         {!isToday && (
-          <Button variant="back" onClick={() => setDate(undefined)} style={{ alignSelf: 'flex-start' }}>
+          <Button variant="back" onClick={() => pickDate(undefined)} style={{ alignSelf: 'flex-start' }}>
             Back
           </Button>
         )}
@@ -103,15 +105,15 @@ export function Home() {
       {data && clips.length > 0 && (
         <div style={st('padding:8px 20px 24px;display:flex;flex-direction:column;gap:28px')}>
           {clips.map((clip) => (
-            <ClipCard key={clip.id} clip={clip} onOpen={() => navigate(R.clip(clip.id))} onShare={() => void share(clip)} onSkip={() => skip(clip)} onMediaError={() => void load(date)} />
+            <ClipCard key={clip.id} clip={clip} onOpen={() => navigate(R.clip(clip.id))} onShare={() => void sharing.share(clip)} shareLabel={sharing.label(clip.id)} shareDisabled={sharing.busy} onSkip={() => skip(clip)} onMediaError={() => void load(date)} />
           ))}
-          <OlderRows older={data.older} tz={tz} now={now} onPick={setDate} />
+          <OlderRows older={data.older} tz={tz} now={now} onPick={pickDate} />
         </div>
       )}
 
       {data && clips.length === 0 && data.older.length > 0 && (
         <div style={st('padding:0 20px 24px;display:flex;flex-direction:column')}>
-          <OlderRows older={data.older} tz={tz} now={now} onPick={setDate} />
+          <OlderRows older={data.older} tz={tz} now={now} onPick={pickDate} />
         </div>
       )}
     </div>

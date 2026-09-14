@@ -144,7 +144,7 @@ export async function buildApp(options: Options = {}) {
       storageBucket:
         process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.appspot.com`,
     });
-  const db = getFirestore(admin, options.databaseId || "(default)"),
+  const db = getFirestore(admin, options.databaseId || process.env.FIRESTORE_DATABASE_ID || "(default)"),
     bucket = getStorage(admin).bucket(),
     auth = getAuth(admin);
   const secret = (value: string | undefined, name: string) =>
@@ -577,8 +577,9 @@ export async function buildApp(options: Options = {}) {
       }
       if (Date.parse(row.expires_at) <= now())
         fail(410, "pair_expired", "Create a new pairing code.");
-      const oldId = shopSnap.data()?.device_id;
+      const oldId = shopSnap.data()?.device_id || shopSnap.data()?.replacement_context?.previous_device_id;
       const old = oldId ? await tx.get(collection("devices").doc(oldId)) : null;
+      const prior = old?.exists && old.data()!.shop_id === row.shop_id ? old.data()! : null;
       const d: Row = {
         id: newId,
         shop_id: row.shop_id,
@@ -594,15 +595,15 @@ export async function buildApp(options: Options = {}) {
         pause_mode: "none",
         paused_until: null,
         framing_until: new Date(now() + 10 * 60000).toISOString(),
-        reference_frame_path: null,
-        reference_frame_revision: null,
+        reference_frame_path: prior?.reference_frame_path || null,
+        reference_frame_revision: prior?.reference_frame_revision || null,
         unpaired_at: null,
         token_version: randomUUID(),
       };
-      if (old?.exists)
+      if (prior && old)
         tx.update(old.ref, { unpaired_at: iso(), config_updated_at: iso() });
       tx.create(collection("devices").doc(newId), d);
-      tx.update(sr, { device_id: newId });
+      tx.update(sr, { device_id: newId, replacement_context: null });
       tx.update(pr, {
         device_id: newId,
         serial,

@@ -10,6 +10,8 @@ npm --prefix firebase-api run dev
 
 Export the values in `.env.example` first, or use the repository local launcher. The API deliberately does not load secret files implicitly. All four application secrets must have at least 32 characters. `API_BASE_URL` must be reachable by the owner, device and worker; localhost works for local smoke, while a physical phone needs the host's LAN address. The API binds loopback unless `HOST` is set. Cloud Run uses application default credentials and a private storage bucket, with no downloaded service-account private key.
 
+`FIRESTORE_DATABASE_ID` selects the Firestore Standard database; unset defaults to `(default)` for local development. For a separately authorized hosted setup in an existing project, set it to the dedicated v2 database ID. Explicit `buildApp({ databaseId })` overrides the environment so emulator tests remain isolated.
+
 The owner authenticates through the Firebase client SDK and sends its ID token. The API verifies revocation and reads `cs2_memberships`; creating a shop atomically creates its owner membership. Client Firestore and Storage access is denied by the included rules. No owner can supply their own membership or device token. Phone OTP wrapper routes return 410 with a Firebase SDK instruction.
 
 Pair claims use Firestore transactions. A pair code can be claimed once; an identical serial can retry only while the resulting device is still paired. Replacing or unpairing a device invalidates its operations while `/device/config` can tell the former device that it is unpaired. Saved reference frames have a stable explicit revision.

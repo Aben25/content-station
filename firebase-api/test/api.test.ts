@@ -514,3 +514,37 @@ test("cron moves expired processing jobs to a retryable queue and stops exhauste
     "failed",
   );
 });
+
+for (const replacement of [false, true]) {
+  test(`saved framing survives ${replacement ? 'replacement' : 'Wi-Fi rescan'} with a new device capability`, async () => {
+    const s = await setup();
+    const image = Buffer.from([255, 216, 255, 224, 1, 2, 255, 217]);
+    await req('POST', '/device/preview', { ...s.dh, 'content-type': 'image/jpeg' }, image);
+    const saved = (await req('POST', '/camera/reference-frame', s.h, {})).json();
+    if (replacement) assert.equal((await req('POST', '/camera/unpair', s.h, {})).statusCode, 200);
+    const token = (await req('POST', '/pair/token', s.h, { ssid: 'Wifi', password: 'secret' })).json().pair_token;
+    const paired = (await req('POST', '/pair/claim', {}, { pair_token: token, serial: crypto.randomUUID() })).json();
+    assert.notEqual(paired.device_id, s.claim.device_id);
+    const config = (await req('GET', '/device/config', { authorization: `Bearer ${paired.device_jwt}` })).json();
+    assert.equal(config.reference_frame_revision, saved.reference_frame_revision);
+    const media = await req('GET', new URL(config.reference_frame_url).pathname);
+    assert.equal(media.statusCode, 200, media.body);
+    assert.deepEqual(media.rawPayload, image);
+    assert.equal((await db.collection('cs2_shops').doc(s.shop.id).get()).data().replacement_context, null);
+  });
+}
+
+test('replacement context cannot inherit or revoke another shop device', async () => {
+  const a = await setup(), b = await setup();
+  const image = Buffer.from([255, 216, 255, 224, 1, 2, 255, 217]);
+  await req('POST', '/device/preview', { ...b.dh, 'content-type': 'image/jpeg' }, image);
+  await req('POST', '/camera/reference-frame', b.h, {});
+  await req('POST', '/camera/unpair', a.h, {});
+  await db.collection('cs2_shops').doc(a.shop.id).update({ replacement_context: { previous_device_id: b.claim.device_id } });
+  const token = (await req('POST', '/pair/token', a.h, { ssid: 'Wifi', password: 'secret' })).json().pair_token;
+  const paired = (await req('POST', '/pair/claim', {}, { pair_token: token, serial: crypto.randomUUID() })).json();
+  const config = (await req('GET', '/device/config', { authorization: `Bearer ${paired.device_jwt}` })).json();
+  assert.equal(config.reference_frame_url, null);
+  assert.equal(config.reference_frame_revision, null);
+  assert.equal((await db.collection('cs2_devices').doc(b.claim.device_id).get()).data().unpaired_at, null);
+});

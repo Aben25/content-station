@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Clip } from '../api/types';
-import { downloadClip, shareClip } from './share';
+import { downloadClip, prepareClipShare, shareClip } from './share';
 
 const clip: Clip = {
   id: 'clip/one', caption: 'A clean fade.', duration_s: 8, status: 'new', created_at: '', delivered_at: null,
@@ -11,8 +11,19 @@ describe('real media actions', () => {
   it('reports a share only after the native share promise succeeds', async () => {
     const fetch = vi.fn(async () => new Response(new Blob(['video']), { status: 200 }));
     const share = vi.fn(async () => undefined);
-    expect(await shareClip(clip, { fetch, navigator: { share, canShare: () => true } })).toBe('shared');
+    const prepared = await prepareClipShare(clip, { refresh: async () => clip, fetch });
+    expect(await shareClip(prepared.clip, { file: prepared.file, navigator: { share, canShare: () => true } })).toBe('shared');
     expect(share).toHaveBeenCalledWith(expect.objectContaining({ files: expect.any(Array) }));
+  });
+
+  it('calls native file sharing synchronously during the final gesture without fetching', async () => {
+    const fetch = vi.fn(() => new Promise<Response>(() => {}));
+    const share = vi.fn(async () => undefined);
+    const file = new File(['video'], 'clip.mp4', { type: 'video/mp4' });
+    const result = shareClip(clip, { fetch, navigator: { share, canShare: () => true }, file } as any);
+    expect(share).toHaveBeenCalledWith({ files: [file], text: clip.caption });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await result).toBe('shared');
   });
 
   it('does not count opening a fallback as a successful share', async () => {
@@ -36,4 +47,14 @@ describe('real media actions', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:clip');
     vi.useRealTimers();
   });
+});
+
+it('refreshes capabilities during preparation and rejects oversized media', async () => {
+  const refreshed = { ...clip, video_url: 'https://media.example/fresh' };
+  const refresh = vi.fn(async () => refreshed);
+  const fetch = vi.fn(async () => new Response('video'));
+  await prepareClipShare(clip, { refresh, fetch });
+  expect(refresh).toHaveBeenCalledWith(clip.id);
+  expect(fetch).toHaveBeenCalledWith(refreshed.video_url);
+  await expect(prepareClipShare(clip, { refresh, fetch: async () => new Response('video', { headers: { 'content-length': '999999999' } }) })).rejects.toThrow('too large');
 });

@@ -9,6 +9,8 @@ interface Props {
   clip: Clip;
   onOpen: () => void;
   onShare: () => void;
+  shareLabel?: string;
+  shareDisabled?: boolean;
   onSkip: () => void;
   onMediaError?: () => void;
 }
@@ -18,7 +20,7 @@ export function placeholderLabel(clip: Clip): string {
 }
 
 // 9:16 card. The video plays while at least 60% of it is on screen and pauses otherwise.
-export function ClipCard({ clip, onOpen, onShare, onSkip, onMediaError }: Props) {
+export function ClipCard({ clip, onOpen, onShare, onSkip, onMediaError, shareLabel = 'Share', shareDisabled }: Props) {
   const video = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -68,8 +70,8 @@ export function ClipCard({ clip, onOpen, onShare, onSkip, onMediaError }: Props)
       </button>
       <div style={st('font-size:16px;line-height:1.35;color:#171614')}>{clip.caption}</div>
       <div style={st('display:flex;gap:10px')}>
-        <Button variant="secondaryFilled" onClick={onShare} style={{ flex: 1 }}>
-          Share
+        <Button variant="secondaryFilled" onClick={onShare} disabled={shareDisabled} style={{ flex: 1 }}>
+          {shareLabel}
         </Button>
         <Button variant="secondary" onClick={onSkip} style={{ flex: 1 }}>
           Skip
