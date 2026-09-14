@@ -10,7 +10,7 @@ import { useToast } from '../hooks/useToast';
 import { usePolling } from '../hooks/usePolling';
 import { dayTitle, dayWord, spanLabel, timeOfDay, todayKey } from '../lib/format';
 import { useClipShare } from '../hooks/useClipShare';
-import { deliveryLabel, statusView } from '../lib/status';
+import { statusView } from '../lib/status';
 import { S_ERROR, S_SCROLL, STRIPES, st } from '../lib/style';
 import { R, navigate } from '../router';
 
@@ -97,7 +97,7 @@ export function Home() {
           </div>
           <div style={st('font-size:20px;font-weight:600')}>No clips yet</div>
           <div style={st('color:#6F6B64;font-size:16px;line-height:1.45;text-wrap:pretty')}>
-            {recorded ? `${recorded} ` : ''}Clips arrive {deliveryLabel(status, now)}, once there's a full day to pick from.
+            {recorded ? `${recorded} ` : ''}Clips appear here after footage is captured and processed. Check Camera for its current status.
           </div>
         </div>
       )}
