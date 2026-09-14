@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { api } from '../api/index';
 import { errorMessage, type CameraStatus, type Clip, type ClipsResponse } from '../api/types';
 import { Button } from '../components/Button';
@@ -7,6 +7,7 @@ import { StatusDot } from '../components/StatusDot';
 import { StripedPanel } from '../components/StripedPanel';
 import { useShopTimezone } from '../hooks/useSession';
 import { useToast } from '../hooks/useToast';
+import { usePolling } from '../hooks/usePolling';
 import { dayTitle, dayWord, spanLabel, timeOfDay, todayKey } from '../lib/format';
 import { shareClip } from '../lib/share';
 import { deliveryLabel, statusView } from '../lib/status';
@@ -22,7 +23,6 @@ export function Home() {
   const [data, setData] = useState<ClipsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<CameraStatus | null>(null);
-  const [statusKnown, setStatusKnown] = useState(false);
 
   const load = useCallback(async (d?: string) => {
     try {
@@ -33,26 +33,9 @@ export function Home() {
     }
   }, []);
 
-  useEffect(() => {
-    void load(date);
-  }, [date, load]);
+  usePolling(() => load(date), 30_000);
 
-  useEffect(() => {
-    let live = true;
-    api
-      .cameraStatus()
-      .then((s) => {
-        if (!live) return;
-        setStatus(s);
-        setStatusKnown(true);
-      })
-      .catch(() => {
-        if (live) setStatusKnown(true);
-      });
-    return () => {
-      live = false;
-    };
-  }, []);
+  usePolling(async () => { try { setStatus(await api.cameraStatus()); } catch { /* retain last truthful status */ } }, 30_000);
 
   const now = new Date();
   const view = status ? statusView(status, now) : null;
@@ -69,21 +52,11 @@ export function Home() {
   const share = async (clip: Clip) => {
     const result = await shareClip(clip);
     if (result === 'unavailable') toast('Share sheet opens: Instagram, TikTok, Save');
-    if (result !== 'cancelled') api.clipEvent(clip.id, 'share').catch(() => undefined);
+    if (result === 'shared') api.clipEvent(clip.id, 'share').catch(() => undefined);
   };
 
-  // Empty state copy. Recorded time comes from the status when the camera is recording,
-  // the prototype sentence stands in when the status could not be loaded at all.
   const seenAt = status?.last_seen_at ? timeOfDay(status.last_seen_at, tz) : null;
-  let recorded: string | null = 'The camera has recorded 2 hours so far.';
-  if (statusKnown && status) {
-    if (status.status === 'recording' && status.status_since) {
-      const end = status.last_seen_at ? Date.parse(status.last_seen_at) : now.getTime();
-      recorded = `The camera has recorded ${spanLabel(end - Date.parse(status.status_since))} so far.`;
-    } else {
-      recorded = null;
-    }
-  }
+  const recorded = status?.recording_seconds_today !== undefined ? `The camera has recorded ${spanLabel(status.recording_seconds_today * 1000)} so far.` : null;
 
   return (
     <div style={st(S_SCROLL)}>
@@ -130,7 +103,7 @@ export function Home() {
       {data && clips.length > 0 && (
         <div style={st('padding:8px 20px 24px;display:flex;flex-direction:column;gap:28px')}>
           {clips.map((clip) => (
-            <ClipCard key={clip.id} clip={clip} onOpen={() => navigate(R.clip(clip.id))} onShare={() => void share(clip)} onSkip={() => skip(clip)} />
+            <ClipCard key={clip.id} clip={clip} onOpen={() => navigate(R.clip(clip.id))} onShare={() => void share(clip)} onSkip={() => skip(clip)} onMediaError={() => void load(date)} />
           ))}
           <OlderRows older={data.older} tz={tz} now={now} onPick={setDate} />
         </div>

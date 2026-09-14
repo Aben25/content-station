@@ -55,6 +55,7 @@ export function SignIn() {
         }}
       />
       {error && <div style={st(S_ERROR)}>{error}</div>}
+      <div id="firebase-recaptcha" />
       <div style={st('flex:1')} />
       <Button type="submit" disabled={busy}>
         Text me a code

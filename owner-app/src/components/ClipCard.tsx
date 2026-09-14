@@ -10,6 +10,7 @@ interface Props {
   onOpen: () => void;
   onShare: () => void;
   onSkip: () => void;
+  onMediaError?: () => void;
 }
 
 export function placeholderLabel(clip: Clip): string {
@@ -17,7 +18,7 @@ export function placeholderLabel(clip: Clip): string {
 }
 
 // 9:16 card. The video plays while at least 60% of it is on screen and pauses otherwise.
-export function ClipCard({ clip, onOpen, onShare, onSkip }: Props) {
+export function ClipCard({ clip, onOpen, onShare, onSkip, onMediaError }: Props) {
   const video = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -52,6 +53,7 @@ export function ClipCard({ clip, onOpen, onShare, onSkip }: Props) {
             muted
             loop
             preload="metadata"
+            onError={onMediaError}
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
           />
         ) : (

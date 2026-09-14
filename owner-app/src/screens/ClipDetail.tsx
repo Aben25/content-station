@@ -26,6 +26,7 @@ export function ClipDetail({ id }: { id: string }) {
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
+  const refreshedMediaUrl = useRef<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -69,6 +70,13 @@ export function ClipDetail({ id }: { id: string }) {
     if (v.duration > 0) setProgress(Math.min(100, (v.currentTime / v.duration) * 100));
   };
 
+  const refreshMedia = async () => {
+    if (!clip?.video_url || refreshedMediaUrl.current === clip.video_url) return;
+    refreshedMediaUrl.current = clip.video_url;
+    try { setClip(await api.clip(clip.id)); }
+    catch (err) { toast(errorMessage(err, "Couldn't refresh this clip. Try again.")); }
+  };
+
   const saveCaption = async () => {
     if (!clip) return;
     const next = caption.trim();
@@ -94,11 +102,13 @@ export function ClipDetail({ id }: { id: string }) {
     if (!clip) return;
     const result = await shareClip(clip);
     if (result === 'unavailable') toast('Share sheet opens: Instagram, TikTok, Save');
-    if (result !== 'cancelled') api.clipEvent(clip.id, 'share').catch(() => undefined);
+    if (result === 'shared') api.clipEvent(clip.id, 'share').catch(() => undefined);
   };
 
-  const download = () => {
-    if (clip) downloadClip(clip);
+  const download = async () => {
+    if (!clip) return;
+    try { if (!(await downloadClip(clip))) toast("Couldn't download the clip. Try again."); }
+    catch (err) { toast(errorMessage(err, "Couldn't download the clip. Try again.")); }
   };
 
   const skip = async () => {
@@ -149,6 +159,7 @@ export function ClipDetail({ id }: { id: string }) {
               onTimeUpdate={onTime}
               onPlay={() => setPlaying(true)}
               onPause={() => setPlaying(false)}
+              onError={() => void refreshMedia()}
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
             />
           ) : (
@@ -193,7 +204,7 @@ export function ClipDetail({ id }: { id: string }) {
           Share
         </Button>
         <div style={st('display:flex;gap:8px')}>
-          <Button variant="ghostDark" onClick={download}>
+          <Button variant="ghostDark" onClick={() => void download()}>
             Download
           </Button>
           <Button variant="ghostDark" onClick={() => void skip()}>

@@ -19,18 +19,42 @@ import { Settings } from './screens/Settings';
 import { Shop } from './screens/Shop';
 import { SignIn } from './screens/SignIn';
 import { Wifi } from './screens/Wifi';
+import { ownerConfig } from './api/index';
 
 const NAV_TABS: Partial<Record<Route['name'], Tab>> = { home: 'home', camera: 'camera', settings: 'settings' };
 
 export default function App() {
+  if (ownerConfig.mode === 'setup') return <Setup missing={ownerConfig.missing} />;
+  return <ConfiguredApp />;
+}
+
+function ConfiguredApp() {
   const session = useSessionState();
   return (
     <SessionProvider value={session}>
       <ToastProvider>
+        {ownerConfig.mode === 'demo' && <div style={st('position:fixed;z-index:20;top:8px;right:8px;background:#E08A2E;color:#171614;padding:5px 9px;border-radius:8px;font-size:11px;font-weight:700;letter-spacing:.06em')}>DEMO DATA</div>}
         <Shell />
       </ToastProvider>
     </SessionProvider>
   );
+}
+
+function Setup({ missing }: { missing: string[] }) {
+  return <div style={st(S_PAGE)}>
+    <div style={st('flex:1')} />
+    <div style={st('display:flex;flex-direction:column;gap:10px')}>
+      <div style={st('font-size:13px;font-weight:600;letter-spacing:.08em;color:#E08A2E')}>CONTENTSTATION</div>
+      <div style={st('font-size:30px;font-weight:600;line-height:1.1')}>Connect this owner app</div>
+      <div style={st('color:#6F6B64;line-height:1.5')}>Add the Firebase project and API settings, then restart the app. For local work, the API runs at port 4310 and Firebase Auth can use the local emulator.</div>
+    </div>
+    <div style={st('background:#fff;border:1px solid rgba(23,22,20,.08);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:7px')}>
+      <div style={st('font-size:13px;font-weight:600')}>MISSING SETTINGS</div>
+      {missing.map((name) => <div key={name} style={st('font:13px ui-monospace,SFMono-Regular,monospace;color:#6F6B64')}>{name}</div>)}
+    </div>
+    <div style={st('font-size:13px;color:#6F6B64')}>Sample data is available only when VITE_DEMO_MODE=true.</div>
+    <div style={st('flex:1')} />
+  </div>;
 }
 
 function Shell() {

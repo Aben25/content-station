@@ -1,11 +1,14 @@
 import type { Api } from './Api';
+import { resolveOwnerConfig } from './config';
+import { FirebaseApi } from './firebase';
+import { createFirebaseAuthAdapter } from './firebaseAuth';
 import { MockApi, mockVariantFromLocation } from './mock';
-import { SupabaseApi } from './supabase';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
-// Both env vars set: real backend. Otherwise the in memory mock.
-export const isMock = !(url && key);
-
-export const api: Api = isMock ? new MockApi(mockVariantFromLocation()) : new SupabaseApi(url as string, key as string);
+export const ownerConfig = resolveOwnerConfig(import.meta.env);
+export const isMock = ownerConfig.mode === 'demo';
+const unconfiguredApi = () => new Proxy({}, { get() { return () => Promise.reject(new Error('ContentStation needs Firebase configuration.')); } }) as Api;
+export const api: Api = ownerConfig.mode === 'demo'
+  ? new MockApi(mockVariantFromLocation())
+  : ownerConfig.mode === 'firebase'
+    ? new FirebaseApi(createFirebaseAuthAdapter(ownerConfig), ownerConfig.apiBaseUrl)
+    : unconfiguredApi();

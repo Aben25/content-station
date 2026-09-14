@@ -108,6 +108,7 @@ export interface CameraStatus {
   timezone: string;
   workstation: string;
   next_delivery_at: string | null;
+  recording_seconds_today?: number;
 }
 
 export interface FramingStart {
