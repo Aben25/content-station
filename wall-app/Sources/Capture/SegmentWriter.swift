@@ -47,6 +47,7 @@ final class SegmentWriter {
     private var encoderWidth = 0
     private var encoderHeight = 0
     private var forceKeyframe = false
+    private var generation = CaptureGeneration()
 
     private var writer: AVAssetWriter?
     private var input: AVAssetWriterInput?
@@ -57,8 +58,11 @@ final class SegmentWriter {
     func setDeviceID(_ value: String?) {
         queue.async {
             guard self.deviceID != value else { return }
+            self.generation.advance()
             self.finishFile()
             self.ring.removeAll()
+            self.lastMotionDate = nil
+            self.forceKeyframe = true
             self.deviceID = value
         }
     }
@@ -142,15 +146,19 @@ final class SegmentWriter {
             forceKeyframe = false
         }
         var flags = VTEncodeInfoFlags()
+        let capturedGeneration = generation.current
         let status = VTCompressionSessionEncodeFrame(
             encoder,
             imageBuffer: pixelBuffer,
             presentationTimeStamp: presentationTime,
             duration: CMTime(value: 1, timescale: CMTimeScale(max(1, fps))),
             frameProperties: properties,
-            sourceFrameRefcon: nil,
             infoFlagsOut: &flags
-        )
+        ) { [weak self] status, flags, sample in
+            guard status == noErr, !flags.contains(.frameDropped), let sample,
+                  CMSampleBufferDataIsReady(sample) else { return }
+            self?.handleEncoded(sample, generation: capturedGeneration)
+        }
         if status != noErr {
             Log.capture.error("encode failed \(status, privacy: .public)")
         }
@@ -159,6 +167,7 @@ final class SegmentWriter {
     private func rebuildEncoder(width: Int, height: Int) {
         // A format change ends the current file; passthrough inputs cannot
         // switch dimensions mid file.
+        generation.advance()
         finishFile()
         ring.removeAll()
         if let encoder {
@@ -174,8 +183,8 @@ final class SegmentWriter {
             encoderSpecification: nil,
             imageBufferAttributes: nil,
             compressedDataAllocator: nil,
-            outputCallback: segmentWriterOutputCallback,
-            refcon: Unmanaged.passUnretained(self).toOpaque(),
+            outputCallback: nil,
+            refcon: nil,
             compressionSessionOut: &session
         )
         guard status == noErr, let session else {
@@ -198,8 +207,9 @@ final class SegmentWriter {
     }
 
     /// Called from the encoder thread.
-    fileprivate func handleEncoded(_ sample: CMSampleBuffer) {
+    private func handleEncoded(_ sample: CMSampleBuffer, generation captured: UUID) {
         queue.async {
+            guard self.generation.accepts(captured) else { return }
             self.ingest(sample)
         }
     }
@@ -392,13 +402,4 @@ final class SegmentWriter {
         guard age.isFinite else { return Date() }
         return Date().addingTimeInterval(-age)
     }
-}
-
-/// C callback for VideoToolbox. Hands the sample to the writer.
-private let segmentWriterOutputCallback: VTCompressionOutputCallback = { refcon, _, status, flags, sampleBuffer in
-    guard let refcon, status == noErr, let sampleBuffer else { return }
-    if flags.contains(.frameDropped) { return }
-    guard CMSampleBufferDataIsReady(sampleBuffer) else { return }
-    let writer = Unmanaged<SegmentWriter>.fromOpaque(refcon).takeUnretainedValue()
-    writer.handleEncoded(sampleBuffer)
 }

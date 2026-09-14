@@ -190,3 +190,10 @@ enum UploadAuthorization {
         return origin == active
     }
 }
+
+/// Used on the writer serial queue. Each async encode captures its generation.
+struct CaptureGeneration {
+    private(set) var current = UUID()
+    mutating func advance() { current = UUID() }
+    func accepts(_ captured: UUID) -> Bool { captured == current }
+}

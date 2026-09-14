@@ -32,3 +32,12 @@ MainActor.assumeIsolated {
     machine.config = framing
     check(!machine.isFramingActive, "saved reference ends active framing")
 }
+var generation = CaptureGeneration()
+let previousFrame = generation.current
+check(generation.accepts(previousFrame), "current encoder callback accepted")
+generation.advance()
+check(!generation.accepts(previousFrame), "late old-pairing callback rejected after switch")
+let newFrame = generation.current
+check(generation.accepts(newFrame), "new-pairing callback accepted")
+generation.advance()
+check(!generation.accepts(newFrame) && !generation.accepts(previousFrame), "unpair or encoder rebuild invalidates outstanding callbacks")
