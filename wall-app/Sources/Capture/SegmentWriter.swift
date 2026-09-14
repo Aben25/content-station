@@ -12,6 +12,7 @@ struct SegmentFile: Codable, Equatable {
     var height: Int
     var fps: Int
     var bytes: Int
+    var deviceID: String?
 }
 
 /// Encodes every frame with VideoToolbox so a three second pre roll of
@@ -50,6 +51,18 @@ final class SegmentWriter {
     private var writer: AVAssetWriter?
     private var input: AVAssetWriterInput?
     private var fileURL: URL?
+    private var deviceID: String?
+    private var fileDeviceID: String?
+
+    func setDeviceID(_ value: String?) {
+        queue.async {
+            guard self.deviceID != value else { return }
+            self.finishFile()
+            self.ring.removeAll()
+            self.deviceID = value
+        }
+    }
+
     private var fileStartDate: Date?
     private var fileLastDate: Date?
     private var lastMotionDate: Date?
@@ -276,6 +289,7 @@ final class SegmentWriter {
             self.writer = writer
             self.input = input
             fileURL = url
+            fileDeviceID = deviceID
             fileStartDate = first.date
             fileLastDate = first.date
             pendingRoll = false
@@ -309,6 +323,7 @@ final class SegmentWriter {
         let width = encoderWidth
         let height = encoderHeight
         let fps = self.fps
+        let origin = fileDeviceID
         self.writer = nil
         self.input = nil
         fileURL = nil
@@ -324,12 +339,12 @@ final class SegmentWriter {
         writer.finishWriting { [weak self] in
             guard let self else { return }
             self.queue.async {
-                self.completed(url: url, start: start, end: end, width: width, height: height, fps: fps, error: writer.error)
+                self.completed(url: url, start: start, end: end, width: width, height: height, fps: fps, deviceID: origin, error: writer.error)
             }
         }
     }
 
-    private func completed(url: URL, start: Date, end: Date, width: Int, height: Int, fps: Int, error: Error?) {
+    private func completed(url: URL, start: Date, end: Date, width: Int, height: Int, fps: Int, deviceID: String?, error: Error?) {
         let duration = end.timeIntervalSince(start)
         if let error {
             Log.capture.error("segment failed: \(error.localizedDescription, privacy: .public)")
@@ -343,7 +358,7 @@ final class SegmentWriter {
         }
         let bytes = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
         secondsWrittenToday += duration
-        let file = SegmentFile(url: url, startDate: start, endDate: end, width: width, height: height, fps: fps, bytes: bytes)
+        let file = SegmentFile(url: url, startDate: start, endDate: end, width: width, height: height, fps: fps, bytes: bytes, deviceID: deviceID)
         Log.capture.info("segment finished \(url.lastPathComponent, privacy: .public) \(Int(duration), privacy: .public) s \(bytes, privacy: .public) bytes")
         onSegmentFinished?(file)
     }

@@ -50,7 +50,7 @@ final class StateMachine: ObservableObject {
     @Published private(set) var isInsideHours = true
     @Published private(set) var isFramingActive = false
 
-    /// The reference frame url seen when the current framing window opened.
+    /// The saved reference revision seen when the current framing window opened.
     /// Framing exits as soon as a different one arrives.
     private var framingReferenceAtStart: String??
     private var timer: Timer?
@@ -86,7 +86,7 @@ final class StateMachine: ObservableObject {
         let current = now()
         if config.isFraming(at: current) {
             if framingReferenceAtStart == nil || old?.framingUntil != config.framingUntil {
-                framingReferenceAtStart = .some(config.referenceFrameUrl)
+                framingReferenceAtStart = .some(config.referenceFrameRevision)
             }
         } else {
             framingReferenceAtStart = nil
@@ -97,7 +97,7 @@ final class StateMachine: ObservableObject {
         guard let config, config.isFraming(at: current) else { return false }
         guard let start = framingReferenceAtStart else { return true }
         // Exit when a new reference frame arrives.
-        if start != config.referenceFrameUrl, config.referenceFrameUrl != nil {
+        if config.hasNewReference(comparedTo: start) {
             return false
         }
         return true

@@ -4,22 +4,21 @@ The iOS app that runs on an iPhone mounted permanently on a shop wall. It captur
 
 ## Generate and build
 
-Requirements: Xcode 26 and XcodeGen (`brew install xcodegen`).
+Requirements: Xcode 26. Build the checked-in project directly; regeneration is optional and requires a complete XcodeGen installation.
 
 ```
 cd wall-app
-xcodegen generate
 xcodebuild -project ContentStationWall.xcodeproj -scheme ContentStationWall \
   -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
 
-`ContentStationWall.xcodeproj` is generated output. Edit `project.yml` and regenerate instead of editing the project in Xcode.
+Keep `project.yml` and the checked-in project consistent. `Info-Debug.plist` mirrors `Info.plist` and adds only the local-network ATS exception. Release uses `Info.plist` without that exception.
 
 Target: `ContentStationWall`, bundle id `com.contentstation.station`, iOS 17.0, iPhone only, portrait only, SwiftUI lifecycle, Swift 5 language mode.
 
-## API base URL and anon key
+## API configuration
 
-The app needs two values: the Edge Function base url (`{SUPABASE_URL}/functions/v1/api`) and the Supabase anon key. It reads them in this order:
+The app requires `CS_API_BASE_URL`, the Firebase API / Cloud Run origin. No suffix is added. `CS_SUPABASE_ANON_KEY` is optional for a legacy backend. Configuration reads in this order:
 
 1. `Resources/Config.plist`, keys `CS_API_BASE_URL` and `CS_SUPABASE_ANON_KEY`. Empty values are skipped.
 2. `Info.plist`, same keys, filled from the build settings in `Config.xcconfig`.
@@ -27,8 +26,8 @@ The app needs two values: the Edge Function base url (`{SUPABASE_URL}/functions/
 The simplest path is to edit `Config.xcconfig`:
 
 ```
-CS_API_BASE_URL = https:/$()/abcdefgh.supabase.co/functions/v1/api
-CS_SUPABASE_ANON_KEY = eyJhbGciOi...
+CS_API_BASE_URL = https:/$()/YOUR-SERVICE.run.app
+CS_SUPABASE_ANON_KEY =
 ```
 
 The `$()` after `https:/` keeps xcconfig from reading `//` as a comment. Both values can also be passed on the command line: `xcodebuild ... CS_API_BASE_URL=... CS_SUPABASE_ANON_KEY=...`.
@@ -105,3 +104,11 @@ xcrun altool --upload-app -f build-device/export/ContentStationWall.ipa -t ios -
 ```
 
 `ExportOptions.plist` is method `app-store-connect`, team `HP284BJ924`, automatic signing, upload symbols. Processing takes 5 to 15 minutes, then the internal group gets the build.
+
+## Reliability regressions
+
+Run `Tests/run.sh` for pure Swift policy regressions. Saved reference identity comes only from optional `reference_frame_revision`, never a renewed signed URL. Older servers without a revision cannot signal a save by URL; framing still expires normally.
+
+Queue entries carry the device ID captured when recording starts. Legacy files and unknown crash-orphan files are quarantined, as are entries from another pairing. Same-pairing persisted queue entries resume. Quarantined media remains subject to normal raw retention cleanup; it is never adopted under a new token.
+
+For simulator integration use a Debug build with `CS_API_BASE_URL=http://localhost:4310`. Debug permits local-network HTTP only (`NSAllowsLocalNetworking`); Release keeps ATS defaults. Use a local hostname for physical-device Debug testing. No broad arbitrary-load exception is enabled.

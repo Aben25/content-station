@@ -25,7 +25,7 @@ final class AppCoordinator: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var maintenanceTimer: Timer?
     private var lastCleanupAt = Date.distantPast
-    private var lastReferenceFrameUrl: String?
+    private var lastReferenceFrameRevision: String?
     private var started = false
 
     private init() {
@@ -40,13 +40,15 @@ final class AppCoordinator: ObservableObject {
         pairing = PairingFlow(api: api, identity: identity, stateMachine: stateMachine)
 
         if let cached = ConfigStore.load() {
-            lastReferenceFrameUrl = cached.referenceFrameUrl
+            lastReferenceFrameRevision = cached.referenceFrameRevision
             stateMachine.config = cached
         }
         stateMachine.previewOverride = LaunchArguments.previewState
         if paired && !api.isConfigured {
             Log.app.error("paired but api not configured")
         }
+        uploads.setPairing(deviceID: paired ? Keychain.string(for: .deviceId) : nil, token: paired ? Keychain.string(for: .deviceJWT) : nil)
+        pipeline.segmentWriter.setDeviceID(paired ? Keychain.string(for: .deviceId) : nil)
         wire()
     }
 
@@ -150,17 +152,17 @@ final class AppCoordinator: ObservableObject {
         }
         pipeline.thumbnails.send = { [weak self] data in
             Task { @MainActor in
-                guard let self, self.stateMachine.isPaired else { return }
+                guard let self, self.stateMachine.isPaired, let token = Keychain.string(for: .deviceJWT) else { return }
                 Task.detached { [api = self.api] in
-                    do { try await api.thumb(jpeg: data) } catch { Log.network.debug("thumb failed") }
+                    do { try await api.thumb(jpeg: data, token: token) } catch { Log.network.debug("thumb failed") }
                 }
             }
         }
         pipeline.previews.send = { [weak self] data in
             Task { @MainActor in
-                guard let self, self.stateMachine.isPaired else { return }
+                guard let self, self.stateMachine.isPaired, let token = Keychain.string(for: .deviceJWT) else { return }
                 Task.detached { [api = self.api] in
-                    do { try await api.preview(jpeg: data) } catch { Log.network.debug("preview failed") }
+                    do { try await api.preview(jpeg: data, token: token) } catch { Log.network.debug("preview failed") }
                 }
             }
         }
@@ -215,6 +217,8 @@ final class AppCoordinator: ObservableObject {
 
         pairing.onPaired = { [weak self] response in
             guard let self else { return }
+            self.uploads.setPairing(deviceID: response.deviceId, token: response.deviceJwt)
+            self.pipeline.segmentWriter.setDeviceID(response.deviceId)
             self.stateMachine.fault = nil
             self.stateMachine.isPaired = true
             if let config = response.config {
@@ -250,17 +254,17 @@ final class AppCoordinator: ObservableObject {
             return
         }
         ConfigStore.save(config)
-        let previousReference = lastReferenceFrameUrl
+        let previousReference = lastReferenceFrameRevision
         stateMachine.config = config
-        if let reference = config.referenceFrameUrl, reference != previousReference {
+        if config.hasNewReference(comparedTo: previousReference) {
             // A new reference frame: store the current picture as the drift
             // baseline and clear any drift.
-            lastReferenceFrameUrl = reference
+            lastReferenceFrameRevision = config.referenceFrameRevision
             pipeline.captureReferenceFrame()
             pipeline.clearDrift()
             stateMachine.driftDetected = false
-        } else if config.referenceFrameUrl == nil {
-            lastReferenceFrameUrl = nil
+        } else if config.referenceFrameRevision == nil {
+            lastReferenceFrameRevision = nil
         }
     }
 
@@ -286,11 +290,14 @@ final class AppCoordinator: ObservableObject {
         guard stateMachine.isPaired else { return }
         Log.app.warning("unpairing: \(reason, privacy: .public)")
         stopNormalLoop()
+        uploads.setPairing(deviceID: nil, token: nil)
+        pipeline.segmentWriter.setDeviceID(nil)
+        api.cancelOutstandingRequests()
         Keychain.delete(.deviceJWT)
         Keychain.delete(.deviceId)
         ConfigStore.clear()
         pipeline.driftDetector.clearReference()
-        lastReferenceFrameUrl = nil
+        lastReferenceFrameRevision = nil
         stateMachine.driftDetected = false
         stateMachine.fault = nil
         stateMachine.config = nil

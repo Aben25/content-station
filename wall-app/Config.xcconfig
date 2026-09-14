@@ -1,5 +1,5 @@
-// Build settings that end up in Info.plist. Fill these in for a real backend.
-// CS_API_BASE_URL is {SUPABASE_URL}/functions/v1/api. Escape the double slash
-// after the scheme as $()/ so xcconfig does not read it as a comment.
-CS_API_BASE_URL = https:/$()/YOUR-PROJECT.supabase.co/functions/v1/api
+// Firebase/Cloud Run API origin. No route suffix is added.
+// Escape // as /$()/ in xcconfig values. Set CS_API_BASE_URL before use.
+CS_API_BASE_URL =
+// Optional compatibility header for a legacy backend only.
 CS_SUPABASE_ANON_KEY =

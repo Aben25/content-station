@@ -48,9 +48,11 @@ final class HeartbeatService {
         let body = await gather()
         do {
             let config = try await api.heartbeat(body)
+            guard !Task.isCancelled else { return }
             onSuccess?()
             onConfig?(config)
         } catch let error as ApiError {
+            if Task.isCancelled { return }
             Log.network.error("heartbeat failed: \(error.description, privacy: .public)")
             if case .unauthorized = error {
                 onUnauthorized?()

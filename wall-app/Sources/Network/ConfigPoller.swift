@@ -36,6 +36,7 @@ final class ConfigPoller {
         while !Task.isCancelled {
             do {
                 let config = try await api.config(since: since, wait: 25)
+                guard !Task.isCancelled else { return }
                 since = config.updatedAt ?? since
                 backoff = 1
                 onSuccess?()

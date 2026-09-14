@@ -57,6 +57,9 @@ targets:
       properties:
         com.apple.developer.networking.HotspotConfiguration: true
     settings:
+      configs:
+        Debug:
+          INFOPLIST_FILE: Info-Debug.plist
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.contentstation.station
         TARGETED_DEVICE_FAMILY: "1"

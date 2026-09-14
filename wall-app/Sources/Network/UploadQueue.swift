@@ -6,6 +6,8 @@ import Foundation
 /// `Product.rawRetentionHours`, whichever comes first.
 final class UploadQueue: NSObject {
     struct Item: Codable, Equatable {
+        var deviceID: String?
+        var quarantined: Bool?
         var id: String
         var fileName: String
         var startTs: String
@@ -41,6 +43,36 @@ final class UploadQueue: NSObject {
     private var items: [Item] = []
     private var session: URLSession!
     private var processing = false
+    private var activeDeviceID: String?
+    private var activeToken: String?
+    private var processTask: Task<Void, Never>?
+
+    func setPairing(deviceID: String?, token: String?) {
+        queue.sync {
+            if activeDeviceID != deviceID || activeToken != token { processTask?.cancel() }
+            activeDeviceID = deviceID
+            activeToken = token
+            for index in items.indices where !UploadAuthorization.permits(origin: items[index].deviceID, active: deviceID, token: token) {
+                items[index].quarantined = true
+                items[index].inFlight = false
+            }
+            save()
+        }
+        session.getAllTasks { tasks in
+            for task in tasks {
+                guard let id = task.taskDescription, let item = self.item(id: id), self.credentials(for: item) != nil else { task.cancel(); continue }
+            }
+        }
+        kick()
+    }
+
+    private func credentials(for item: Item) -> String? {
+        queue.sync {
+            guard let current = items.first(where: { $0.id == item.id }), current.quarantined != true,
+                  UploadAuthorization.permits(origin: current.deviceID, active: activeDeviceID, token: activeToken) else { return nil }
+            return activeToken
+        }
+    }
 
     init(api: ApiClient, segmentsDirectory: URL, supportDirectory: URL) {
         self.api = api
@@ -61,6 +93,8 @@ final class UploadQueue: NSObject {
     func enqueue(_ file: SegmentFile) {
         queue.async {
             let item = Item(
+                deviceID: file.deviceID,
+                quarantined: !UploadAuthorization.permits(origin: file.deviceID, active: self.activeDeviceID, token: self.activeToken),
                 id: UUID().uuidString,
                 fileName: file.url.lastPathComponent,
                 startTs: TimeFormat.iso8601(file.startDate),
@@ -82,7 +116,7 @@ final class UploadQueue: NSObject {
         queue.async {
             guard !self.processing else { return }
             self.processing = true
-            Task {
+            self.processTask = Task {
                 await self.processDue()
                 self.queue.async { self.processing = false }
             }
@@ -106,6 +140,11 @@ final class UploadQueue: NSObject {
             if kept != self.items {
                 self.items = kept
                 self.save()
+                self.session.getAllTasks { tasks in
+                    for task in tasks {
+                        if let id = task.taskDescription, self.item(id: id) == nil { task.cancel() }
+                    }
+                }
             }
             let known = Set(self.items.map(\.fileName))
             let files = (try? FileManager.default.contentsOfDirectory(at: self.segmentsDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
@@ -135,6 +174,8 @@ final class UploadQueue: NSObject {
                     continue
                 }
                 let item = Item(
+                    deviceID: nil,
+                    quarantined: true,
                     id: UUID().uuidString,
                     fileName: url.lastPathComponent,
                     startTs: TimeFormat.iso8601(start),
@@ -178,11 +219,13 @@ final class UploadQueue: NSObject {
             return items.filter { !$0.inFlight && $0.nextAttemptAt <= now }
         }
         for item in due {
+            guard !Task.isCancelled else { return }
             await process(item)
         }
     }
 
     private func process(_ original: Item) async {
+        guard !Task.isCancelled, let token = credentials(for: original) else { return }
         var item = original
         let fileURL = segmentsDirectory.appendingPathComponent(item.fileName)
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
@@ -200,7 +243,8 @@ final class UploadQueue: NSObject {
                     height: item.height,
                     fps: item.fps
                 )
-                _ = try await api.segmentComplete(request)
+                _ = try await api.segmentComplete(request, token: token)
+                guard !Task.isCancelled, credentials(for: item) == token else { return }
                 onConnectivity?(true)
                 remove(id: item.id)
                 removeFile(named: item.fileName)
@@ -209,7 +253,8 @@ final class UploadQueue: NSObject {
                 return
             }
             if item.uploadUrl == nil || urlExpired(item) {
-                let response = try await api.segmentUploadUrl(startTs: item.startTs, endTs: item.endTs)
+                let response = try await api.segmentUploadUrl(startTs: item.startTs, endTs: item.endTs, token: token)
+                guard !Task.isCancelled, credentials(for: item) == token else { return }
                 onConnectivity?(true)
                 item.path = response.path
                 item.uploadUrl = response.uploadUrl
@@ -234,16 +279,23 @@ final class UploadQueue: NSObject {
             task.taskDescription = item.id
             item.inFlight = true
             update(item)
+            guard !Task.isCancelled, credentials(for: item) == token else { task.cancel(); return }
             task.resume()
             Log.upload.info("uploading \(item.fileName, privacy: .public)")
         } catch let error as ApiError {
+            guard !Task.isCancelled, credentials(for: item) == token else { return }
             if case .unauthorized = error {
-                DispatchQueue.main.async { self.onUnauthorized?() }
+                queue.sync { processTask?.cancel() }
+                DispatchQueue.main.async {
+                    guard self.credentials(for: item) == token else { return }
+                    self.onUnauthorized?()
+                }
                 return
             }
             if error.isConnectivityFailure { onConnectivity?(false) }
             fail(item, reason: error.description)
         } catch {
+            guard !Task.isCancelled, credentials(for: item) == token else { return }
             fail(item, reason: error.localizedDescription)
         }
     }
@@ -282,10 +334,8 @@ final class UploadQueue: NSObject {
 
     private func update(_ item: Item) {
         queue.sync {
-            if let index = items.firstIndex(where: { $0.id == item.id }) {
+            if let index = items.firstIndex(where: { $0.id == item.id }), items[index].quarantined != true {
                 items[index] = item
-            } else {
-                items.append(item)
             }
             save()
         }
@@ -327,7 +377,7 @@ final class UploadQueue: NSObject {
 
 extension UploadQueue: URLSessionDelegate, URLSessionTaskDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        guard let id = task.taskDescription, let item = item(id: id) else { return }
+        guard let id = task.taskDescription, let item = item(id: id), credentials(for: item) != nil else { return }
         let status = (task.response as? HTTPURLResponse)?.statusCode ?? 0
         if error == nil, (200..<300).contains(status) {
             var updated = item
@@ -338,9 +388,12 @@ extension UploadQueue: URLSessionDelegate, URLSessionTaskDelegate {
             onConnectivity?(true)
             Log.upload.info("uploaded \(item.fileName, privacy: .public)")
             kick()
-        } else if status == 401 {
-            fail(item, reason: "unauthorized")
-            DispatchQueue.main.async { self.onUnauthorized?() }
+        } else if status == 401 || status == 403 {
+            // Storage capability expiry does not revoke the device pairing.
+            var retry = item
+            retry.uploadUrl = nil
+            retry.expiresAt = nil
+            fail(retry, reason: "storage capability rejected; refresh URL")
         } else {
             if error != nil { onConnectivity?(false) }
             fail(item, reason: error?.localizedDescription ?? "http \(status)")

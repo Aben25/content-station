@@ -11,6 +11,7 @@ struct DeviceConfig: Codable, Equatable {
     var pauseMode: String?
     var framingUntil: String?
     var referenceFrameUrl: String?
+    var referenceFrameRevision: String?
     var unpaired: Bool?
     var workstation: String?
 
@@ -24,8 +25,14 @@ struct DeviceConfig: Codable, Equatable {
         case pauseMode = "pause_mode"
         case framingUntil = "framing_until"
         case referenceFrameUrl = "reference_frame_url"
+        case referenceFrameRevision = "reference_frame_revision"
         case unpaired
         case workstation
+    }
+
+    func hasNewReference(comparedTo previous: String?) -> Bool {
+        guard let revision = referenceFrameRevision, !revision.isEmpty else { return false }
+        return revision != previous
     }
 
     var pausedUntilDate: Date? { pausedUntil.flatMap(TimeFormat.parseISO8601) }
@@ -174,4 +181,12 @@ struct ApiErrorEnvelope: Decodable {
         var message: String
     }
     var error: Body
+}
+
+/// Fail closed for legacy media or incomplete credentials.
+enum UploadAuthorization {
+    static func permits(origin: String?, active: String?, token: String?) -> Bool {
+        guard let origin, !origin.isEmpty, let token, !token.isEmpty else { return false }
+        return origin == active
+    }
 }

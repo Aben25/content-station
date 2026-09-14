@@ -10,7 +10,7 @@ enum ApiError: Error, CustomStringConvertible {
 
     var description: String {
         switch self {
-        case .notConfigured: return "api base url or anon key missing"
+        case .notConfigured: return "api base url missing"
         case .unauthorized: return "unauthorized"
         case .server(let code, let message, let status): return "\(status) \(code): \(message)"
         case .transport(let error): return "transport: \(error.localizedDescription)"
@@ -58,12 +58,12 @@ final class ApiClient {
         session = URLSession(configuration: configuration)
         if mock {
             Log.network.info("api running in mock mode")
-        } else if baseURL == nil || anonKey.isEmpty {
-            Log.network.error("api base url or anon key not set, see README")
+        } else if baseURL == nil {
+            Log.network.error("api base url not set, see README")
         }
     }
 
-    var isConfigured: Bool { isMock || (baseURL != nil && !anonKey.isEmpty) }
+    var isConfigured: Bool { isMock || (baseURL != nil) }
 
     // MARK: Routes
 
@@ -91,20 +91,24 @@ final class ApiClient {
         _ = try await send("POST", "/device/status", jsonBody: StatusRequest(status: status, code: code), as: OkResponse.self)
     }
 
-    func segmentUploadUrl(startTs: String, endTs: String) async throws -> UploadUrlResponse {
-        try await send("POST", "/device/segment/upload-url", jsonBody: UploadUrlRequest(startTs: startTs, endTs: endTs), as: UploadUrlResponse.self)
+    func segmentUploadUrl(startTs: String, endTs: String, token: String) async throws -> UploadUrlResponse {
+        try await send("POST", "/device/segment/upload-url", jsonBody: UploadUrlRequest(startTs: startTs, endTs: endTs), token: token, as: UploadUrlResponse.self)
     }
 
-    func segmentComplete(_ request: SegmentCompleteRequest) async throws -> SegmentCompleteResponse {
-        try await send("POST", "/device/segment/complete", jsonBody: request, as: SegmentCompleteResponse.self)
+    func segmentComplete(_ request: SegmentCompleteRequest, token: String) async throws -> SegmentCompleteResponse {
+        try await send("POST", "/device/segment/complete", jsonBody: request, token: token, as: SegmentCompleteResponse.self)
     }
 
-    func preview(jpeg: Data) async throws {
-        _ = try await send("POST", "/device/preview", rawBody: (jpeg, "image/jpeg"), as: EmptyResponse.self)
+    func preview(jpeg: Data, token: String) async throws {
+        _ = try await send("POST", "/device/preview", rawBody: (jpeg, "image/jpeg"), token: token, as: EmptyResponse.self)
     }
 
-    func thumb(jpeg: Data) async throws {
-        _ = try await send("POST", "/device/thumb", rawBody: (jpeg, "image/jpeg"), as: EmptyResponse.self)
+    func thumb(jpeg: Data, token: String) async throws {
+        _ = try await send("POST", "/device/thumb", rawBody: (jpeg, "image/jpeg"), token: token, as: EmptyResponse.self)
+    }
+
+    func cancelOutstandingRequests() {
+        session.getAllTasks { tasks in tasks.forEach { $0.cancel() } }
     }
 
     // MARK: Core
@@ -117,12 +121,13 @@ final class ApiClient {
         rawBody: (Data, String)? = nil,
         auth: Bool = true,
         timeout: TimeInterval = 30,
+        token: String? = nil,
         as type: T.Type
     ) async throws -> T {
         if isMock {
             return try await mock.respond(method: method, path: path, query: query, as: type)
         }
-        guard let baseURL, !anonKey.isEmpty else { throw ApiError.notConfigured }
+        guard let baseURL else { throw ApiError.notConfigured }
         guard var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false) else {
             throw ApiError.notConfigured
         }
@@ -132,10 +137,10 @@ final class ApiClient {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = timeout
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
+        if !anonKey.isEmpty { request.setValue(anonKey, forHTTPHeaderField: "apikey") }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if auth {
-            guard let jwt = deviceJWT(), !jwt.isEmpty else { throw ApiError.unauthorized }
+            guard let jwt = token ?? deviceJWT(), !jwt.isEmpty else { throw ApiError.unauthorized }
             request.setValue("Bearer \(jwt)", forHTTPHeaderField: "Authorization")
         }
         if let jsonBody {
@@ -146,6 +151,7 @@ final class ApiClient {
             request.httpBody = rawBody.0
         }
 
+        try Task.checkCancellation()
         let data: Data
         let response: URLResponse
         do {
@@ -154,6 +160,7 @@ final class ApiClient {
             Log.network.error("\(method, privacy: .public) \(path, privacy: .public) transport error")
             throw ApiError.transport(error)
         }
+        try Task.checkCancellation()
         guard let http = response as? HTTPURLResponse else { throw ApiError.badResponse(0) }
         Log.network.debug("\(method, privacy: .public) \(path, privacy: .public) -> \(http.statusCode, privacy: .public)")
 
