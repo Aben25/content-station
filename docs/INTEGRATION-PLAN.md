@@ -1,5 +1,7 @@
 # Firebase integration implementation plan
 
+> Historical implementation plan. Its checkboxes record the original task breakdown, not current completion status. Firebase deployment and physical iPhone capture are now verified in [hosted verification](reports/hosted-verification.md). The later user authorization covered replacing the old cloud system. For current scope and the next self-hosted Postiz phase, read [HANDOFF-PLAN.md](../HANDOFF-PLAN.md); earlier deployment and publishing exclusions below describe the original phase only.
+
 Goal: preserve the supplied v2 owner/wall design while a real uploaded MP4 flows through OpenShorts into private clips that the owner can play, share and delete.
 
 User approved connecting the system and requested Firebase/Google instead of Supabase. The design ZIP matches the committed prototypes. Work is isolated on codex/connect-v2; main and the old engine checkout are not deployment targets.

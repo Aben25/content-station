@@ -10,7 +10,7 @@ npm --prefix firebase-api run dev
 
 Export the values in `.env.example` first, or use the repository local launcher. The API deliberately does not load secret files implicitly. All four application secrets must have at least 32 characters. `API_BASE_URL` must be reachable by the owner, device and worker; localhost works for local smoke, while a physical phone needs the host's LAN address. The API binds loopback unless `HOST` is set. Cloud Run uses application default credentials and a private storage bucket, with no downloaded service-account private key.
 
-`FIRESTORE_DATABASE_ID` selects the Firestore Standard database; unset defaults to `(default)` for local development. For a separately authorized hosted setup in an existing project, set it to the dedicated v2 database ID. Explicit `buildApp({ databaseId })` overrides the environment so emulator tests remain isolated.
+`FIRESTORE_DATABASE_ID` selects the Firestore Standard database; unset defaults to `(default)`. The authorized hosted pilot uses project `lemekeru`, database `(default)` and `cs2_` collections; see [hosted setup](../docs/HOSTED-SETUP.md). Explicit `buildApp({ databaseId })` overrides the environment so emulator tests remain isolated.
 
 The owner authenticates through the Firebase client SDK and sends its ID token. The API verifies revocation and reads `cs2_memberships`; creating a shop atomically creates its owner membership. Client Firestore and Storage access is denied by the included rules. No owner can supply their own membership or device token. Phone OTP wrapper routes return 410 with a Firebase SDK instruction.
 
@@ -40,4 +40,4 @@ The main integration tests use the configured Auth emulator project and an isola
 
 A narrow `gaxios` dependency override selects patched `uuid` 11.1.1 or later; its stable `v4()` API is used for multipart boundaries. Firebase Admin 14.4 and this override leave `npm audit` with zero known vulnerabilities.
 
-No hosted resources, rules, texts or deployments are created by build or test commands. Docker configuration is provided for review only. Before hosting, set the actual project/bucket, HTTPS API URL, owner origin, managed secrets, least-privilege service identity, and authenticated scheduler secret. Remove emulator environment variables. Apply the deny-client-access rules explicitly during the separately authorized deployment.
+No hosted resources, rules, texts or deployments are created by build or test commands. The API is already deployed in the authorized project `lemekeru`; see [hosted setup](../docs/HOSTED-SETUP.md) and [verification](../docs/reports/hosted-verification.md). Future deployments must retain the production project/bucket, HTTPS URLs, HTTP/2 upload support, managed secrets, service identity, scheduler authentication and deny-client-access rules. Remove emulator environment variables before deploying.

@@ -1,5 +1,7 @@
 # ContentStation
 
+**Continuing this project? Start with [the current handoff and next-work plan](HANDOFF-PLAN.md).** It records the deployed Firebase system, verified camera flow, remaining pilot checks and planned self-hosted Postiz integration. The active branch is `codex/connect-v2`.
+
 A mounted iPhone captures shop work, an OpenShorts worker makes vertical clips, and the owner views, edits captions, shares, or deletes them in a mobile website. The design matches the supplied Scope and visual direction handoff.
 
 The active implementation uses **Firebase Authentication, Firestore and private Cloud Storage**, a Node API suitable for Google Cloud Run, and the real pinned OpenShorts renderer. `supabase/` remains an unused reference from the initial v2 branch. It is not needed to run this system.
@@ -48,7 +50,7 @@ The camera release configuration now uses the hosted HTTPS API. Build 9 also rep
 
 Default `ENGINE_MODE=local` selects a bounded high-motion window and invokes upstream OpenShorts for vertical rendering. This makes the connection testable without a model key. It does not claim semantic understanding or polished editorial selection. The worker also has an opt-in `ai` mode for upstream analysis, including silent-footage visual analysis; that mode requires configured model access and has not been quality-validated by the local smoke.
 
-No automatic social posting or approval queue is included. Owner sharing/export remains manual. The owner app is a mobile website; the mounted camera app is native iOS.
+No automatic social posting or approval queue is included. Owner sharing/export remains manual. The next phase is owner-approved publishing and scheduling through self-hosted Postiz, starting with Instagram and Facebook; see [the implementation plan](HANDOFF-PLAN.md#next-work-self-hosted-postiz). The owner app is a mobile website; the mounted camera app is native iOS.
 
 ## Hosting
 

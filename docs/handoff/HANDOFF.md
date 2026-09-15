@@ -1,5 +1,7 @@
 # ContentStation: Coding Agent Handoff
 
+> Historical design brief. For the deployed system and current work, start with [HANDOFF-PLAN.md](../../HANDOFF-PLAN.md). The user subsequently chose Firebase/Google and authorized replacing the old system. Supabase/Vercel defaults, automatic blur/delivery promises, QR distance, support placeholders and original phase restrictions below are not current implementation facts. Preserve the supplied visual direction; use the current handoff and verification reports for behavior and scope.
+
 Read this whole file before writing any code. Then read the design files listed in section 9. Ask before deviating from anything marked **Decided**.
 
 Working name: **ContentStation** (may be renamed to Filmhand; keep all product strings in one constants file so the swap is one edit).

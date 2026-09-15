@@ -40,7 +40,7 @@ No credentials are copied into the image. Supply the API endpoint and engine key
 
 Build this directory's Dockerfile and run it as a continuously running worker. On Google Cloud, a Cloud Run worker pool is appropriate; a request-driven Cloud Run service with idle CPU throttling is not sufficient for this polling loop. Configure one instance initially and mount secrets through Secret Manager. Do not package local job media or credentials in an image.
 
-The container definition is provided, not a claim that a cloud image was built or deployed. No hosted worker is created by local setup.
+The pinned image is deployed to the `contentstation-render` Cloud Run worker pool in project `lemekeru`; real hosted uploads and physical iPhone capture have produced decoded clips. See [hosted setup](../docs/HOSTED-SETUP.md) and [verification](../docs/reports/hosted-verification.md). Local setup itself does not deploy cloud resources.
 
 ## Upstream notices
 
