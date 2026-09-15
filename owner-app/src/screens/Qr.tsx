@@ -74,7 +74,8 @@ export function Qr({ flow }: { flow: WifiFlow }) {
         </Button>
         <div style={st(S_STEP)}>{flow === 'rescan' ? 'Re-scan, 2 of 2' : 'Step 4 of 7'}</div>
       </div>
-      <div style={st('font-size:28px;font-weight:600;line-height:1.15;text-align:center;text-wrap:balance')}>Hold this up to the camera</div>
+      <div style={st('font-size:28px;font-weight:600;line-height:1.15;text-align:center;text-wrap:balance')}>Show this code to the station iPhone</div>
+      <div style={st('text-align:center;color:#6F6B64;font-size:15px;line-height:1.45;text-wrap:pretty')}>Keep ContentStation Wall open on the other iPhone. Point its rear camera at this QR code.</div>
       <QRCode value={pair.qr_payload} />
       <div style={st('display:flex;align-items:center;gap:10px;height:44px;padding:0 18px;border-radius:22px;background:#fff;border:1px solid rgba(23,22,20,.1);flex:none')}>
         <StatusDot color={connected ? '#2F8F5B' : '#E08A2E'} size={10} pulse={!connected} />
@@ -86,10 +87,10 @@ export function Qr({ flow }: { flow: WifiFlow }) {
           background: STRIPE_LIGHT,
         }}
       >
-        illustration: person on the shop floor holding a phone up toward a corner-mounted camera
+        Use two devices: this screen shows the code, and the station iPhone scans it. If you have only one phone, open this website on a laptop or tablet to show the code.
       </div>
       <div style={st('flex:1')} />
-      <div style={st('text-align:center;color:#6F6B64;font-size:15px;text-wrap:balance')}>Stand 6 to 8 feet from the camera. This screen moves on by itself.</div>
+      <div style={st('text-align:center;color:#6F6B64;font-size:15px;text-wrap:balance')}>Start about 1 to 2 feet away with the whole code facing the rear camera. Keep both screens awake and avoid glare. This page advances when the station connects.</div>
     </div>
   );
 }
