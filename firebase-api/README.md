@@ -24,6 +24,12 @@ Segment completion verifies stored size and content type, then creates determini
 
 Deletion tombstones the clip and source and cancels the source job before touching storage. Storage failures return 503 with `deletion_pending`; retrying the deletion or cron finishes it. Existing sibling clips remain available, but the source cannot produce new clips. Cron also expires incomplete raw uploads and retries failed object deletion. Raw source retention is configured in root `product.json`.
 
+## Publishing
+
+Set `POSTIZ_URL` (the instance API base, `.../api` on the container's port), `POSTIZ_JWT_SECRET` (that instance's `JWT_SECRET`) and `PUBLISHING_SECRET` (32+ characters, encrypts per-shop organization keys in Firestore) to enable owner-approved publishing; `POSTIZ_PROVIDERS` defaults to `facebook,instagram` and `OWNER_APP_URL` is where the platform login returns. Leave them unset to keep publishing hidden. `src/postiz.ts` is the client, `src/publishing.ts` the routes; `docs/FIREBASE-CONTRACT.md` has the shapes and `postiz/README.md` the instance details.
+
+`test/publishing.test.ts` uses `test/fake-postiz.ts`, an in-process mock of the Postiz routes with failure modes for timeouts, outages and rejections. It proves the API's behaviour around the contract, not platform acceptance. `scripts/postiz-local.mjs verify` exercises the real pinned instance.
+
 ## SMS
 
 `SMS_MODE=disabled` is the default. `dry-run` records a dry-run notification without sending or setting `delivered_at`. `live` requires Twilio configuration. Daily delivery acquires a transactional notification lease, waits for the provider's successful response, and only then marks clips delivered. Provider failures remain retryable. A process crash after provider acceptance but before the database acknowledgement can cause a duplicate text on retry; provider acceptance is not proof of handset delivery. The signed Twilio inbound webhook is available only when configured.

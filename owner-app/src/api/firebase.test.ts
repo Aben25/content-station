@@ -33,6 +33,23 @@ describe('FirebaseApi requests', () => {
     expect(fetch.mock.calls[1]?.[1]).toMatchObject({ headers: expect.objectContaining({ Authorization: 'Bearer renewed-token' }) });
   });
 
+  it('sends the publish decision as posted and unwraps the publication list', async () => {
+    const publication = { id: 'pub-1', state: 'queued', channels: [] };
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(publication), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ publications: [publication] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response('', { status: 200 }));
+    const api = new FirebaseApi(auth(), 'http://127.0.0.1:4310', fetch);
+    const input = { account_ids: ['acct-fb'], schedule_at: null, idempotency_key: 'key-1' };
+    expect(await api.publishClip('clip/one', input)).toEqual(publication);
+    expect(fetch.mock.calls[0][0]).toBe('http://127.0.0.1:4310/clips/clip%2Fone/publish');
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual(input);
+    expect(await api.clipPublications('clip/one')).toEqual([publication]);
+    expect(fetch.mock.calls[1][0]).toBe('http://127.0.0.1:4310/clips/clip%2Fone/publications');
+    await api.disconnectAccount('acct/fb');
+    expect(fetch.mock.calls[2]).toEqual(['http://127.0.0.1:4310/publishing/accounts/acct%2Ffb', expect.objectContaining({ method: 'DELETE' })]);
+  });
+
   it('calls the browser fetch function without using the API instance as its receiver', async () => {
     const browserFetch = vi.fn(function (this: unknown) {
       if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');

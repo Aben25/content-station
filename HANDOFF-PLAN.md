@@ -1,6 +1,6 @@
 # ContentStation: next-agent handoff and implementation plan
 
-Updated September 14, 2026, Pacific time (September 15 UTC). Baseline application commit: `adeeb98afe0942bdad536400b29e0b29db7194df`.
+Updated September 14, 2026, Pacific time (September 15 UTC), after the local Postiz integration pass. Baseline application commit: the commit that introduced `postiz/` and `firebase-api/src/publishing.ts` (see `git log`); the previous baseline was `adeeb98afe0942bdad536400b29e0b29db7194df`.
 
 ## Start here
 
@@ -8,9 +8,9 @@ Continue from **`codex/connect-v2`** in [Aben25/content-station](https://github.
 
 This document records the latest user direction and the next implementation plan. Read [README.md](README.md) for local setup and [docs/HOSTED-SETUP.md](docs/HOSTED-SETUP.md) for cloud operations. The [original design handoff](docs/handoff/HANDOFF.md) remains a visual reference, with superseded technical and product assumptions. Current code, the verification reports, and the user's later instructions take precedence over those assumptions.
 
-**Current milestone:** physical iPhone capture → authenticated upload → Google Cloud OpenShorts render → owner playback works. **Next milestone:** one real shop connects its social account, approves a camera-generated clip, publishes from ContentStation, and sees the live post link.
+**Current milestone:** physical iPhone capture → authenticated upload → Google Cloud OpenShorts render → owner playback works, and owner-approved publishing through self-hosted Postiz is implemented and verified locally (API, owner website, pinned instance). **Next milestone:** one real shop connects its social account on a hosted instance, approves a camera-generated clip, publishes from ContentStation, and sees the live post link.
 
-The current user request is to push the existing work and this handoff. **Postiz has not been installed or integrated.** No social account has been connected, no social post has been sent, and no publishing service subscription has been purchased.
+State of publishing: the pinned Postiz stack runs locally, the ContentStation API provisions one Postiz organization per shop and publishes through it, and the owner website has the connect/review/publish/schedule screens. **No Meta developer app exists, no hosted Postiz has been provisioned, no social account has been connected, and no social post has been sent.** In production the feature stays hidden until the API receives the `POSTIZ_*` secrets. See [the local verification report](docs/reports/postiz-local-verification.md).
 
 ## User direction and product scope
 
@@ -34,7 +34,7 @@ The current user request is to push the existing work and this handoff. **Postiz
 | Renderer | Cloud Run worker pool `contentstation-render`, `us-central1`, one instance, 2 CPU / 4 GiB |
 | Maintenance | Cloud Scheduler `contentstation-maintenance`, every minute |
 | Camera | `com.contentstation.station`, version 1.0.0 build 9, accepted in internal TestFlight |
-| Social publishing | Not implemented; manual share/download works |
+| Social publishing | Implemented behind configuration and verified locally; hidden on the hosted site until a Postiz instance and Meta app exist. Manual share/download works |
 
 On this handoff pass, the owner site returned HTTP 200 and API `/health` returned HTTP 200, `ok=true`, `project_id=lemekeru`, `emulator=false`, at **2026-09-15 02:17:38 UTC**. This is a reachability check, not a new end-to-end test.
 
@@ -54,7 +54,9 @@ Remaining product validation: useful editorial selection on real shop footage; W
 | --- | --- |
 | API and ownership checks | [firebase-api/src/app.ts](firebase-api/src/app.ts), especially `ownerShop`, `ownedClip`, and media routes |
 | Owner API contract and adapter | [Api.ts](owner-app/src/api/Api.ts), [types.ts](owner-app/src/api/types.ts), [firebase.ts](owner-app/src/api/firebase.ts) |
-| Owner publishing entry points | [Settings.tsx](owner-app/src/screens/Settings.tsx), [ClipDetail.tsx](owner-app/src/screens/ClipDetail.tsx), [router.ts](owner-app/src/router.ts) |
+| Owner publishing screens | [Accounts.tsx](owner-app/src/screens/Accounts.tsx), [PublishPanel.tsx](owner-app/src/components/PublishPanel.tsx), [usePublications.ts](owner-app/src/hooks/usePublications.ts), [ClipDetail.tsx](owner-app/src/screens/ClipDetail.tsx), [Settings.tsx](owner-app/src/screens/Settings.tsx) |
+| Publishing backend | [postiz.ts](firebase-api/src/postiz.ts) (client, key vault), [publishing.ts](firebase-api/src/publishing.ts) (routes, reconciliation), [fake-postiz.ts](firebase-api/test/fake-postiz.ts) and [publishing.test.ts](firebase-api/test/publishing.test.ts) |
+| Postiz stack | [postiz/README.md](postiz/README.md), `postiz/docker-compose.yml`, `scripts/postiz-local.mjs` |
 | Login behavior | [firebaseAuth.ts](owner-app/src/api/firebaseAuth.ts) and its tests |
 | Native camera | [wall-app/README.md](wall-app/README.md), `wall-app/ContentStationWall.xcodeproj` |
 | Clip processing | [engine-worker/README.md](engine-worker/README.md), [contentstation_worker.py](engine-worker/contentstation_worker.py) |
@@ -66,53 +68,48 @@ Remaining product validation: useful editorial selection on real shop footage; W
 
 `supabase/` is an unused reference. It is not the running backend.
 
-## Next work: self-hosted Postiz
+## Publishing: what is done and what remains
 
-The following is an implementation plan, not a claim of existing functionality. Verify the selected upstream version before treating any Postiz API behavior as established.
+Everything below was verified on September 14, 2026 (Pacific) on this Mac; details and limits are in [docs/reports/postiz-local-verification.md](docs/reports/postiz-local-verification.md).
 
-### 1. Prove organization isolation and account setup locally
+### Done: pinned local stack and organization isolation (plan step 1)
 
-Pin a Postiz release/commit and run its recommended Docker Compose stack: Postiz, PostgreSQL, Redis and Temporal. Keep it a separate service and preserve its upstream license/notices. Record the pin, setup, storage volumes, backup/restore procedure and upgrade process in the repository, with credentials supplied at runtime.
+- `postiz/docker-compose.yml` pins `ghcr.io/gitroomhq/postiz-app:v2.23.0` by tag and digest with PostgreSQL, Redis, Temporal and Elasticsearch. Elasticsearch is required: Temporal's SQL visibility store refuses Postiz's Text search attributes and the backend exits at startup without it.
+- `node scripts/postiz-local.mjs setup | up | verify | down` generates ignored secrets, starts the stack, and runs the two-organization check. The check passed 17/17 against the real instance: provisioning through `POST /enterprise/create-user` (JWT signed with the instance secret), duplicate and forged provisioning refused, per-organization uploads including a real MP4, one organization unable to list, post to, or delete another's channels and drafts, and persistence across a container restart. Channels in that check are labelled fake database rows; drafts start no workflow; no platform was contacted.
+- Organization provisioning through the public API is not documented upstream; the pinned source has the unauthenticated-but-signed `/enterprise` routes, which is what the API uses. Recheck them on any upgrade.
 
-Create two test organizations. Verify how organizations are created, how organization-scoped credentials are obtained, and how an owner connects a channel. Public API support for automatic organization provisioning has **not** been verified. Inspect the upstream implementation; document any manual pilot onboarding step honestly rather than inventing an API or calling the experience seamless.
+### Done: ContentStation publishing backend (plan step 2)
 
-Completion: the running pinned service can authenticate and store a draft, and credentials for organization A cannot read or mutate organization B's channels, posts or media. Record behavior for the actual routes used by ContentStation. A simulated provider response is not proof that a social platform accepted a post.
+- One Postiz organization per shop, created lazily from the shop record in `cs2_memberships`/`cs2_shops`; the organization key is AES-GCM encrypted with `PUBLISHING_SECRET` in `cs2_publishing_orgs` and never returned to clients.
+- Connection start goes through `/enterprise/url` with a redirect back to the owner site (`#/accounts`) and a completion webhook that the API verifies with the instance secret before it touches any record; the channel list is then read from Postiz.
+- Publications (`cs2_publications`) are shop-scoped, keyed by the owner's idempotency key, written before the send, and given a unique scheduled second; unanswered sends are reconciled by looking posts up by time and channel before any resend. Outcomes are polled from Postiz on reads and from the maintenance tick (`publications_checked` in the cron response). Clip deletion and account removal cancel queued posts.
+- Tests: 8 new emulator-backed tests against an in-process fake Postiz (two-shop denial, foreign clip/account/publication IDs, duplicate taps, timeout with and without a created post, rejection and outage, scheduling and cancel, disconnect and delete, cron reconciliation, no keys in responses). All 24 API tests pass.
 
-### 2. Add the ContentStation publishing backend
+### Done: owner website (plan step 3)
 
-Extend the existing Firebase-authenticated API through a small Postiz adapter. Derive the shop from `cs2_memberships` and the verified Firebase identity. The current membership model assigns one shop to each user; multi-location switching is separate future work.
+- Settings has a Connected accounts row. The Accounts screen lists connected accounts, connects (full-page hand-off to the platform login, return handled at `#/accounts?added=…`), reconnects expired ones, and removes with a confirmation that states what happens to posts. An unconfigured server shows a plain message.
+- Clip Detail has a Publish action when accounts exist, a review sheet with the saved caption, account selection, Now or a shop-time schedule, and a per-account outcome list with live links, failures, cancel and late hints. Delete copy mentions cancelled scheduled posts and posts that stay published. Sharing and download are unchanged.
+- 42 owner tests pass (typecheck and production build too), including the new Accounts, ClipDetail, adapter and helper tests. A demo-mode browser pass of the new screens was done with sample data; see the report for what that does and does not prove.
 
-Store the shop → Postiz organization mapping and references to server-held credentials. Keep connection attempts, allowed channel IDs, publishing records and provider post IDs bound to that shop. Check clip ownership and channel ownership on every connection/publish/status/cancel action. Client-supplied shop or organization IDs are never proof of access.
+### Remaining: Google hosting and the first platforms (plan step 4)
 
-Use a shop-scoped idempotency key for each publish request. Record an attempt before sending it to Postiz; preserve returned Postiz IDs and each channel's status. If a timeout occurs after sending, reconcile the uncertain result before another send. Do not assume Postiz offers exactly-once creation or blindly retry an ambiguous POST.
+Nothing is provisioned. The steps, in order, and who can do them:
 
-Upload approved media through Postiz's documented upload API before creating a post. Keep raw camera segments private. Model scheduled, processing, published, failed and uncertain outcomes distinctly; return a live post link only when available. Authenticate provider callbacks using the documented mechanism, correlate them with stored records, and tolerate duplicate/out-of-order delivery; use polling if necessary.
+1. **Meta developer app (user).** Create the app on a business portfolio, add Facebook Login for Business, set the redirect URIs `https://<postiz host>/integrations/social/facebook` and `.../instagram`, request `pages_show_list`, `pages_manage_posts`, `pages_read_engagement`, `business_management`, `instagram_basic`, `instagram_content_publish`, and switch the app to Live. Public use needs business verification; the pilot's own Page and Instagram professional account can be added as testers before review. Provide `FACEBOOK_APP_ID` and `FACEBOOK_APP_SECRET` through Secret Manager only.
+2. **Host Postiz (needs authorization; it costs money).** Candidate: one Compute Engine VM (4 vCPU, 8 GB, 50 GB) in `lemekeru`, `postiz/docker-compose.yml` bound to loopback behind a TLS reverse proxy on a stable HTTPS name, `DISABLE_SSRF_PROTECTION` and `NOT_SECURED` unset, `DISABLE_REGISTRATION=true`, scheduled `pg_dump` and uploads backups, and a tested restart. The uploads path must be publicly reachable because the platforms fetch media from it.
+3. **Connect the API.** Add `POSTIZ_URL`, `POSTIZ_JWT_SECRET` and `PUBLISHING_SECRET` to Secret Manager, map them into the Cloud Run API, redeploy. The owner website needs no change; the feature appears when `GET /publishing/accounts` reports `configured: true`.
+4. Run `node scripts/postiz-local.mjs verify` against the hosted instance (point `postiz/.env`/`postiz.env` copies at it or adapt the script's URL and secret), then connect the designated test Page.
 
-Completion: tests cover two-shop access denial, foreign clip/channel IDs, duplicate taps, timeout reconciliation, per-channel partial failure, expired connections, and status/cancel ownership. Tokens remain server-side and out of logs.
+### Remaining: first real post and pilot (plan step 5)
 
-### 3. Extend the owner website using the supplied design
+With explicit authorization for the test account and approved content: publish one camera-generated clip, confirm the platform accepted it and the live link appears in the app, test a scheduled post and a reconnect after revoking the platform authorization, and record the evidence without tokens or private footage. Only then recruit the 10 pilot shops.
 
-Add connected accounts in Settings and a review → choose accounts → publish/schedule flow from Clip Detail. Preserve caption editing and show the saved caption that will be published. Make scheduling times explicit in the shop's timezone.
+### Known limits to keep in the product copy
 
-Show pending, published and failed states with useful recovery actions and real published links. Keep sharing/export available. Connection cancellation or expired authorization should return the owner to a usable screen. Only expose platforms configured on our instance.
-
-Treat clip deletion and publishing separately: decide and implement cancellation of queued posts and cleanup of media copied into Postiz. Explain that deleting a ContentStation clip does not automatically remove an already published social post. Retention and cancellation behavior must agree with the UI copy.
-
-Completion: browser tests demonstrate account connection return/cancellation, review and scheduling, reload persistence, duplicate-click handling, expired connection recovery, partial failures and access isolation. Provider mocks should be labelled as such in reports.
-
-### 4. Configure Google hosting and the first social platforms
-
-Estimate the additional ongoing hosting cost and document the selected deployment. A continuously running Google Cloud VM with Docker Compose is a candidate for the pilot; a topology has **not** been selected or provisioned. Postiz needs persistent services and storage, so do not assume our existing static Firebase Hosting or request-driven API deployment is sufficient.
-
-Use a stable HTTPS address, runtime secrets, private database/queue access, backups and a tested restart. Register the required platform developer applications and configure their exact OAuth callbacks. Begin with Instagram and Facebook; confirm account eligibility and permissions for the pinned integration. Each shop authorizes its own social account through the platform login screen.
-
-Completion: the service survives a restart, retains the two shops' separated data and schedules, and a designated test account connects successfully. Report platform review/permission blockers separately from code readiness. Ask only for missing account access or actions the user needs to complete; continue independent implementation work meanwhile.
-
-### 5. Verify the first real post, then run the pilot
-
-With authorization for the exact test account and approved content, publish one camera-generated clip. Verify platform acceptance and the returned live link, then test a scheduled post and a reconnect/failure path. Keep drafts and test media separate from customer content.
-
-Completion: a real owner can connect, review, publish and see the outcome without agent assistance. Record reproducible evidence without exposing tokens or private footage. Only then onboard the planned 10 shops in one niche and evaluate clips approved/published, time saved and willingness to pay.
+- Postiz's public API cannot delete media, so a copy of every published or queued clip stays in the shop's organization library until removed server-side. The owner app says so on delete.
+- Per-post failure reasons are not exposed by the public list route; the app shows a generic failure with a reconnect hint.
+- If the owner cancels or fails the platform login, Postiz shows its own error page and does not redirect back; the Accounts screen tells owners to use the browser's Back button.
+- Postiz webhooks are unsigned and UI-configured, so they are not used; outcomes are polled, with the maintenance tick as the fallback.
 
 ## Postiz research references
 
@@ -140,6 +137,9 @@ Self-hosting removes the Postiz Cloud subscription, not infrastructure costs, ma
 - **Camera release:** current internal TestFlight build is 9, App Store Connect app `6793229212`, team `HP284BJ924`, group `Sutway`. App Store production release and external tester invitations have not been performed.
 - **Maintenance:** `SMS_MODE=dry-run` leaves daily clip texts unsent. Firebase phone sign-in is separate. Automatic face blurring is absent, so keep product copy truthful.
 - **Private diagnostics:** API request URLs can contain pairing tokens. Strip query strings and print explicit field allowlists instead of entire cloud logs, job documents, authentication records or device configurations.
+- **Docker on this Mac:** there is no Docker Desktop. `colima` (4 CPU, 8 GiB) provides the engine; `docker compose` needs `cliPluginsExtraDirs: ["/opt/homebrew/lib/docker/cli-plugins"]` in `~/.docker/config.json`. `colima start` after a reboot. The Postiz image is 5.6 GB.
+- **Firebase emulators for tests:** another project's emulators sit on the default ports on this Mac. `.runtime/firebase.emulators.json` (ignored) runs this repo's Auth/Firestore/Storage emulators on 19099/18080/19199 with copied rules; export the matching `*_EMULATOR_HOST` values before `npm --prefix firebase-api test`. OpenJDK 21 is installed where `scripts/local.mjs` looks for it.
+- **Postiz specifics:** `POSTIZ_URL` ends in `/api`; organization keys go in the `Authorization` header without `Bearer`; `API_LIMIT` is a per-IP hourly budget for the whole backend, so keep it high; drafts never contact a platform; cross-organization deletes answer 500, not 403.
 
 ## Local-only access and artifacts
 
@@ -151,11 +151,12 @@ On the current Mac, this checkout is under `outputs/contentstation-v2` in the Co
 - `.runtime/deploy/`: build 9 signed archive and IPA. The accepted build is available through TestFlight; archives/signing material are not repository deliverables.
 - `.runtime/cloud-sdk-venv/bin/python`: local Python with gcloud worker-pool dependencies. If the system gcloud Python reports missing grpc/cffi, use `CLOUDSDK_PYTHON_SITEPACKAGES=1` and this interpreter for that command.
 - Existing App Store Connect CLI credentials are in the Mac's `~/.asc/config.json`; read only the fields needed, without printing the file or signing keys.
+- `postiz/.env` and `postiz/postiz.env` (ignored): local database passwords and the local instance `JWT_SECRET`. `.runtime/postiz-verify.json` holds the last verify run with organization IDs only. Both are throwaway local values; the hosted instance gets its own.
 
 A fresh checkout can run locally via `npm run setup` and `npm run dev` using generated local secrets and Firebase emulators. Cloud administration, hosted fictional logins and signed iOS builds require separate authorized credentials. Missing ignored files are not missing source code.
 
 ## Validation when resuming
 
-For documentation-only work, check links, diffs and accidental sensitive content. For implementation, run the affected tests and builds from the component READMEs. Use `scripts/smoke-e2e.py` for local real-render verification; it refuses hosted targets. The hosted smoke requires an explicit `--project lemekeru`, an authorized input file and local fictional test configuration. Its camera requests simulate a phone; cite the separate physical test for handset evidence.
+For documentation-only work, check links, diffs and accidental sensitive content. For implementation, run the affected tests and builds from the component READMEs. For publishing work: `node scripts/postiz-local.mjs up && node scripts/postiz-local.mjs verify`, `npm --prefix firebase-api test` (with emulators), `npm --prefix owner-app test && npm --prefix owner-app run typecheck && npm --prefix owner-app run build`. Use `scripts/smoke-e2e.py` for local real-render verification; it refuses hosted targets. The hosted smoke requires an explicit `--project lemekeru`, an authorized input file and local fictional test configuration. Its camera requests simulate a phone; cite the separate physical test for handset evidence.
 
 Update this handoff and the relevant verification report as milestones change. Before the next push, review the staged file list, keep `.runtime/`, credentials, private recordings and build outputs excluded, and verify the pushed branch head matches the local commit.

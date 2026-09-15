@@ -1,5 +1,5 @@
 import type { Api } from './Api';
-import { ApiError, type CameraStatus, type Clip, type ClipEventType, type ClipsResponse, type FramingStart, type HoursSuggestion, type Me, type PairStatus, type PairToken, type PauseUntil, type Preview, type ReferenceFrame, type Session, type Shop, type ShopInput, type ShopPatch, type ShopType } from './types';
+import { ApiError, type CameraStatus, type Clip, type ClipEventType, type ClipsResponse, type FramingStart, type HoursSuggestion, type Me, type PairStatus, type PairToken, type PauseUntil, type Preview, type Publication, type PublishInput, type PublishingOverview, type ReferenceFrame, type Session, type Shop, type ShopInput, type ShopPatch, type ShopType } from './types';
 import { normalizePhone } from '../lib/format';
 type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 export interface AuthUserAdapter { uid: string; phoneNumber: string | null; getIdToken(forceRefresh?: boolean): Promise<string>; }
@@ -31,6 +31,14 @@ export class FirebaseApi implements Api {
   clipEvent(id: string, type: ClipEventType, reason?: string) { return this.request<Clip>('POST', `/clips/${encodeURIComponent(id)}/event`, reason ? { type, reason } : { type }); }
   async deleteClip(id: string) { await this.request<{ ok: true }>('DELETE', `/clips/${encodeURIComponent(id)}`); }
   suggestHours(name: string, type: ShopType) { return this.request<HoursSuggestion>('GET', `/shop/hours/suggest?name=${encodeURIComponent(name)}&type=${encodeURIComponent(type)}`); }
+  publishingAccounts() { return this.request<PublishingOverview>('GET', '/publishing/accounts'); }
+  connectAccount(provider: string) { return this.request<{ url: string; provider: string }>('POST', '/publishing/accounts/connect', { provider }); }
+  reconnectAccount(id: string, provider: string) { return this.request<{ url: string; provider: string }>('POST', `/publishing/accounts/${encodeURIComponent(id)}/reconnect`, { provider }); }
+  async disconnectAccount(id: string) { await this.request<{ ok: true }>('DELETE', `/publishing/accounts/${encodeURIComponent(id)}`); }
+  publishClip(id: string, input: PublishInput) { return this.request<Publication>('POST', `/clips/${encodeURIComponent(id)}/publish`, input); }
+  async clipPublications(id: string) { return (await this.request<{ publications: Publication[] }>('GET', `/clips/${encodeURIComponent(id)}/publications`)).publications; }
+  publication(id: string) { return this.request<Publication>('GET', `/publications/${encodeURIComponent(id)}`); }
+  cancelPublication(id: string) { return this.request<Publication>('POST', `/publications/${encodeURIComponent(id)}/cancel`); }
   private async session(user: AuthUserAdapter): Promise<Session> { return { access_token: await user.getIdToken(false), user_id: user.uid, phone: user.phoneNumber }; }
   private async request<T>(method: Method, path: string, body?: unknown): Promise<T> {
     await this.auth.waitUntilReady(); const user = this.auth.currentUser;

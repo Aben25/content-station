@@ -20,6 +20,7 @@ export const R = {
   rescanQr: '/camera/rescan/qr',
   replace: '/camera/replace',
   settings: '/settings',
+  accounts: '/accounts',
 } as const;
 
 export type Route =
@@ -40,6 +41,7 @@ export type Route =
   | { name: 'rescanQr' }
   | { name: 'replace' }
   | { name: 'settings' }
+  | { name: 'accounts' }
   | { name: 'unknown' };
 
 const STATIC: Record<string, Route['name']> = {
@@ -59,6 +61,7 @@ const STATIC: Record<string, Route['name']> = {
   '/camera/rescan/qr': 'rescanQr',
   '/camera/replace': 'replace',
   '/settings': 'settings',
+  '/accounts': 'accounts',
 };
 
 export function parseHash(hash: string): Route {
@@ -92,6 +95,12 @@ export function stepRoute(step: OnboardingStep): string {
     default:
       return R.home;
   }
+}
+
+// Query string carried inside the hash, for example "#/accounts?added=facebook".
+export function hashQuery(hash: string = location.hash): URLSearchParams {
+  const q = hash.indexOf('?');
+  return new URLSearchParams(q >= 0 ? hash.slice(q + 1) : '');
 }
 
 export function currentPath(): string {

@@ -16,12 +16,13 @@ import { Qr } from './screens/Qr';
 import { Replace } from './screens/Replace';
 import { Rescan } from './screens/Rescan';
 import { Settings } from './screens/Settings';
+import { Accounts } from './screens/Accounts';
 import { Shop } from './screens/Shop';
 import { SignIn } from './screens/SignIn';
 import { Wifi } from './screens/Wifi';
 import { ownerConfig } from './api/index';
 
-const NAV_TABS: Partial<Record<Route['name'], Tab>> = { home: 'home', camera: 'camera', settings: 'settings' };
+const NAV_TABS: Partial<Record<Route['name'], Tab>> = { home: 'home', camera: 'camera', settings: 'settings', accounts: 'settings' };
 
 export default function App() {
   if (ownerConfig.mode === 'setup') return <Setup missing={ownerConfig.missing} />;
@@ -140,6 +141,8 @@ function screenFor(route: Route) {
       return <Replace />;
     case 'settings':
       return <Settings />;
+    case 'accounts':
+      return <Accounts />;
     default:
       return null;
   }

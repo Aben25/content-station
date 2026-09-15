@@ -1,0 +1,166 @@
+# Self-hosted Postiz for ContentStation publishing.
+#
+# Upstream: https://github.com/gitroomhq/postiz-app (AGPL-3.0). This stack runs
+# the unmodified upstream image as a separate service. The pin below is the
+# v2.23.0 release (commit 1e4c8dd5c4f70c4d0abd01e23cc42d5b533d1ab9, 2026-08-04).
+# Update the tag and digest together; see README.md for the upgrade procedure.
+#
+# Variables come from ./.env (compose interpolation: passwords, ports, bind
+# address) and ./postiz.env (application settings). Copy the .example files.
+name: contentstation-postiz
+
+services:
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:v2.23.0@sha256:785f97312f66a347fb96cdccc4ded5a33ced69a672c89a9adc8054e7d6a21dc5
+    restart: unless-stopped
+    env_file:
+      - postiz.env
+    environment:
+      DATABASE_URL: postgresql://${POSTIZ_DB_USER:-postiz}:${POSTIZ_DB_PASSWORD:?set POSTIZ_DB_PASSWORD in .env}@postiz-postgres:5432/${POSTIZ_DB_NAME:-postiz}
+      REDIS_URL: redis://postiz-redis:6379
+      BACKEND_INTERNAL_URL: http://localhost:3000
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_NAMESPACE: default
+      IS_GENERAL: 'true'
+      STORAGE_PROVIDER: local
+      UPLOAD_DIRECTORY: /uploads
+      NEXT_PUBLIC_UPLOAD_DIRECTORY: /uploads
+      NX_ADD_PLUGINS: 'false'
+    volumes:
+      - postiz-config:/config
+      - postiz-uploads:/uploads
+    ports:
+      - '${POSTIZ_BIND:-127.0.0.1}:${POSTIZ_PORT:-4007}:5000'
+    networks:
+      - postiz
+      - temporal
+    depends_on:
+      postiz-postgres:
+        condition: service_healthy
+      postiz-redis:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+
+  postiz-postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTIZ_DB_USER:-postiz}
+      POSTGRES_PASSWORD: ${POSTIZ_DB_PASSWORD:?set POSTIZ_DB_PASSWORD in .env}
+      POSTGRES_DB: ${POSTIZ_DB_NAME:-postiz}
+    volumes:
+      - postiz-postgres:/var/lib/postgresql/data
+    networks:
+      - postiz
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTIZ_DB_USER:-postiz} -d ${POSTIZ_DB_NAME:-postiz}']
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  postiz-redis:
+    image: redis:7.2
+    restart: unless-stopped
+    command: ['redis-server', '--save', '60', '1', '--appendonly', 'yes']
+    volumes:
+      - postiz-redis:/data
+    networks:
+      - postiz
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  # Temporal schedules and runs the publishing workflows (required since Postiz 2.12).
+  # Postiz registers more custom Text search attributes than Temporal's SQL
+  # visibility store allows (three), so Elasticsearch provides visibility exactly as
+  # in upstream's reference stack. Without it the Postiz backend fails at startup with
+  # "cannot have more than 3 search attribute of type Text".
+  temporal-elasticsearch:
+    image: elasticsearch:7.17.27
+    restart: unless-stopped
+    environment:
+      - cluster.routing.allocation.disk.threshold_enabled=true
+      - cluster.routing.allocation.disk.watermark.low=512mb
+      - cluster.routing.allocation.disk.watermark.high=256mb
+      - cluster.routing.allocation.disk.watermark.flood_stage=128mb
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
+      - xpack.security.enabled=false
+    volumes:
+      - temporal-elasticsearch:/usr/share/elasticsearch/data
+    networks:
+      - temporal
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fs http://localhost:9200/_cluster/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  temporal-postgresql:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${TEMPORAL_DB_PASSWORD:?set TEMPORAL_DB_PASSWORD in .env}
+    volumes:
+      - temporal-postgres:/var/lib/postgresql/data
+    networks:
+      - temporal
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U temporal']
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    restart: unless-stopped
+    environment:
+      DB: postgres12
+      DB_PORT: '5432'
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${TEMPORAL_DB_PASSWORD:?set TEMPORAL_DB_PASSWORD in .env}
+      POSTGRES_SEEDS: temporal-postgresql
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+      TEMPORAL_NAMESPACE: default
+      ENABLE_ES: 'true'
+      ES_SEEDS: temporal-elasticsearch
+      ES_VERSION: v7
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig:ro
+    networks:
+      - temporal
+    depends_on:
+      temporal-postgresql:
+        condition: service_healthy
+      temporal-elasticsearch:
+        condition: service_healthy
+
+  # Optional workflow inspector. Start with: docker compose --profile debug up -d
+  temporal-ui:
+    image: temporalio/ui:2.34.0
+    profiles: ['debug']
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://127.0.0.1:8080
+    ports:
+      - '127.0.0.1:${TEMPORAL_UI_PORT:-8080}:8080'
+    networks:
+      - temporal
+    depends_on:
+      - temporal
+
+volumes:
+  postiz-config:
+  postiz-uploads:
+  postiz-postgres:
+  postiz-redis:
+  temporal-postgres:
+  temporal-elasticsearch:
+
+networks:
+  postiz:
+  temporal:

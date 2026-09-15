@@ -17,6 +17,8 @@ import {
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { readFileSync } from "node:fs";
+import { KeyVault, PostizClient } from "./postiz.js";
+import { registerPublishing } from "./publishing.js";
 const product = JSON.parse(
   readFileSync(new URL("../../product.json", import.meta.url), "utf8"),
 );
@@ -40,6 +42,10 @@ type Options = {
   smsMode?: string;
   sendSms?: (phone: string, text: string) => Promise<void>;
   deleteObject?: (path: string) => Promise<void>;
+  postiz?: { url: string; jwtSecret: string; fetcher?: typeof fetch; timeoutMs?: number } | null;
+  publishingSecret?: string;
+  publishingProviders?: string[];
+  ownerAppUrl?: string;
 };
 class ApiError extends Error {
   constructor(
@@ -175,6 +181,25 @@ export async function buildApp(options: Options = {}) {
     process.env.API_BASE_URL ||
     "http://127.0.0.1:4310"
   ).replace(/\/$/, "");
+  // Self-hosted Postiz publishing is optional. Both POSTIZ_URL and
+  // POSTIZ_JWT_SECRET must be set to enable it; PUBLISHING_SECRET protects the
+  // per-shop organization keys stored in Firestore.
+  const postizConfig =
+    options.postiz === null
+      ? null
+      : options.postiz ||
+        (process.env.POSTIZ_URL && process.env.POSTIZ_JWT_SECRET
+          ? { url: process.env.POSTIZ_URL, jwtSecret: process.env.POSTIZ_JWT_SECRET }
+          : null);
+  if (postizConfig && postizConfig.jwtSecret.length < 32)
+    fail(500, "configuration", "Set POSTIZ_JWT_SECRET to at least 32 characters.");
+  const postiz = postizConfig ? new PostizClient(postizConfig) : null;
+  const vault = postiz
+    ? new KeyVault(secret(options.publishingSecret || process.env.PUBLISHING_SECRET, "PUBLISHING_SECRET"))
+    : null;
+  const publishingProviders = options.publishingProviders ||
+    (process.env.POSTIZ_PROVIDERS || "facebook,instagram").split(",").map((s) => s.trim()).filter(Boolean);
+  const ownerAppUrl = (options.ownerAppUrl || process.env.OWNER_APP_URL || product.ownerAppUrl).replace(/\/$/, "");
   const serverOptions = {
     logger: false,
     bodyLimit: 1048576,
@@ -1042,10 +1067,29 @@ export async function buildApp(options: Options = {}) {
     await batch.commit();
     return presentClip({ ...c, status });
   });
+  const publishing = registerPublishing(app, {
+    db,
+    bucket,
+    collection,
+    get,
+    ownerShop,
+    ownedClip,
+    now,
+    iso,
+    fail,
+    str,
+    hash,
+    base,
+    ownerAppUrl,
+    postiz,
+    vault,
+    providers: publishingProviders,
+  });
   app.delete("/clips/:id", async (r) => {
     const c = await ownedClip(r, true);
     if (c.deletion_state === "deleted") return { ok: true };
     await revokeSource(c.segment_id, c.id);
+    await publishing.cancelForClip(c.shop_id, c.id);
     try {
       await cleanupDeletion(c.segment_id);
     } catch {
@@ -1656,12 +1700,20 @@ export async function buildApp(options: Options = {}) {
         });
       }
     }
+    const publications_checked = await publishing.reconcileDue();
     const pairs = await collection("pair_tokens").get();
     const expired = pairs.docs.filter(
       (p) => !p.data().device_id && Date.parse(p.data().expires_at) <= now(),
     );
     for (const p of expired) await p.ref.delete();
-    return { ok: true, deleted, delivered, sms_failed, sms_mode: smsMode };
+    return {
+      ok: true,
+      deleted,
+      delivered,
+      sms_failed,
+      sms_mode: smsMode,
+      publications_checked,
+    };
   });
   app.addContentTypeParser(
     "application/x-www-form-urlencoded",

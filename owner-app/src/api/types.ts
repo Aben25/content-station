@@ -153,6 +153,61 @@ export interface HoursSuggestion {
   source: 'google' | 'default';
 }
 
+// Owner-approved social publishing (docs/FIREBASE-CONTRACT.md, publishing section).
+export interface PublishingAccount {
+  id: string;
+  provider: string; // facebook | instagram
+  provider_label: string;
+  name: string;
+  profile: string | null;
+  picture: string | null;
+  disabled: boolean; // needs reconnecting
+}
+
+export interface PublishingOverview {
+  configured: boolean; // false when the server has no publishing service
+  providers: { id: string; label: string }[];
+  accounts: PublishingAccount[];
+  connect_completed_at?: string | null;
+}
+
+export type PublicationState = 'preparing' | 'sending' | 'queued' | 'uncertain' | 'published' | 'partial' | 'failed' | 'cancelled';
+export type ChannelState = 'pending' | 'queued' | 'uncertain' | 'published' | 'failed' | 'cancelled';
+
+export interface PublicationChannel {
+  account_id: string;
+  provider: string;
+  provider_label: string;
+  name: string;
+  state: ChannelState;
+  live_url: string | null;
+  error: string | null;
+  updated_at: string;
+}
+
+export interface Publication {
+  id: string;
+  clip_id: string;
+  kind: 'now' | 'schedule';
+  scheduled_at: string; // UTC instant the service will post at
+  requested_at: string | null; // the minute the owner chose, for scheduled posts
+  timezone: string;
+  caption: string; // the caption that is published
+  state: PublicationState;
+  late: boolean;
+  cancel_requested: boolean;
+  channels: PublicationChannel[];
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PublishInput {
+  account_ids: string[];
+  schedule_at?: string | null; // ISO instant; omit or null to publish now
+  idempotency_key: string; // stable per owner decision so a repeated tap is one publication
+}
+
 export interface Session {
   access_token: string;
   user_id: string;

@@ -10,6 +10,9 @@ import type {
   PairToken,
   PauseUntil,
   Preview,
+  Publication,
+  PublishInput,
+  PublishingOverview,
   ReferenceFrame,
   Session,
   Shop,
@@ -41,4 +44,13 @@ export interface Api {
   clipEvent(id: string, type: ClipEventType, reason?: string): Promise<Clip>;
   deleteClip(id: string): Promise<void>;
   suggestHours(name: string, type: ShopType): Promise<HoursSuggestion>;
+  // Publishing. Every call is scoped to the signed-in owner's shop on the server.
+  publishingAccounts(): Promise<PublishingOverview>;
+  connectAccount(provider: string): Promise<{ url: string; provider: string }>;
+  reconnectAccount(id: string, provider: string): Promise<{ url: string; provider: string }>;
+  disconnectAccount(id: string): Promise<void>;
+  publishClip(id: string, input: PublishInput): Promise<Publication>;
+  clipPublications(id: string): Promise<Publication[]>;
+  publication(id: string): Promise<Publication>;
+  cancelPublication(id: string): Promise<Publication>;
 }

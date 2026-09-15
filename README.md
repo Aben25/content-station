@@ -36,6 +36,7 @@ The test refuses to run against a hosted project. It simulates the camera's HTTP
 | Piece | Location | Checks |
 |---|---|---|
 | Firebase API | `firebase-api/` | `npm --prefix firebase-api run build`; emulator-backed tests in its README |
+| Publishing service | `postiz/` | `node scripts/postiz-local.mjs up` then `verify` (needs Docker); see its README |
 | Owner website | `owner-app/` | `npm --prefix owner-app test`; `npm --prefix owner-app run typecheck`; `npm --prefix owner-app run build` |
 | OpenShorts worker | `engine-worker/` | `npm run test:worker`; real smoke above |
 | iPhone camera | `wall-app/` | `bash wall-app/Tests/run.sh`; simulator build in its README |
@@ -50,7 +51,7 @@ The camera release configuration now uses the hosted HTTPS API. Build 9 also rep
 
 Default `ENGINE_MODE=local` selects a bounded high-motion window and invokes upstream OpenShorts for vertical rendering. This makes the connection testable without a model key. It does not claim semantic understanding or polished editorial selection. The worker also has an opt-in `ai` mode for upstream analysis, including silent-footage visual analysis; that mode requires configured model access and has not been quality-validated by the local smoke.
 
-No automatic social posting or approval queue is included. Owner sharing/export remains manual. The next phase is owner-approved publishing and scheduling through self-hosted Postiz, starting with Instagram and Facebook; see [the implementation plan](HANDOFF-PLAN.md#next-work-self-hosted-postiz). The owner app is a mobile website; the mounted camera app is native iOS.
+No automatic social posting exists. Owner sharing/export remains manual, and owner-approved publishing or scheduling through self-hosted [Postiz](postiz/README.md) is implemented behind configuration: with `POSTIZ_URL` set, the owner connects a Facebook Page or Instagram account in Settings, reviews a clip and publishes or schedules it, and sees the live link or failure. It is verified locally with a mock and a real pinned instance ([report](docs/reports/postiz-local-verification.md)); no Meta developer app or hosted Postiz exists yet, so no real post has been made. See [the plan](HANDOFF-PLAN.md#next-work-self-hosted-postiz). The owner app is a mobile website; the mounted camera app is native iOS.
 
 ## Hosting
 

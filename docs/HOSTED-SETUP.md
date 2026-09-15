@@ -44,6 +44,12 @@ npx firebase-tools deploy --project lemekeru --config firebase.hosted.json --onl
 
 Firebase web configuration is public project identification, not an administrative credential. Backend secrets and fictional test login codes must remain private.
 
+## Publishing service (planned, not provisioned)
+
+Owner-approved publishing needs a self-hosted Postiz instance ([postiz/README.md](../postiz/README.md)). It requires persistent PostgreSQL, Redis, Temporal with Elasticsearch, a public HTTPS address for the platform OAuth redirects and for the media the platforms fetch, and a Meta developer app. Static Firebase Hosting and the request-driven Cloud Run API cannot host it. The candidate for the pilot is one Compute Engine VM (4 vCPU, 8 GB, 50 GB disk is upstream's recommendation) running `postiz/docker-compose.yml` behind a TLS reverse proxy, with `POSTIZ_BIND=127.0.0.1` so only the proxy reaches the container, scheduled `pg_dump` and uploads backups, and `DISABLE_SSRF_PROTECTION`/`NOT_SECURED` unset.
+
+The API then needs `POSTIZ_URL=https://<postiz host>/api`, `POSTIZ_JWT_SECRET` (same value as the instance `JWT_SECRET`) and `PUBLISHING_SECRET`, all from Secret Manager, plus `OWNER_APP_URL` (already set). Redeploy the API with those secrets mapped and the owner website unchanged; publishing appears in Settings on its own. Estimated additional cost is the VM plus its disk; none of this has been created and no authorization for it has been given.
+
 ## Verification and remaining hardware work
 
 See [hosted verification](reports/hosted-verification.md). `scripts/smoke-hosted.mjs` requires `--project lemekeru` and configured fictional test numbers. It uploads real footage through the camera endpoints and waits for the deployed worker. Its camera is an HTTP simulator, not an iPhone. `--deletion-fixture` uses a separate test shop so the main clip can be retained for browser review.

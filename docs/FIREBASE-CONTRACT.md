@@ -24,6 +24,28 @@ Segment upload keeps the existing protocol: request upload URL with UTC `start_t
 
 Owner clips support caption edits, open/share/skip/report events, deletion and private media. Mark a clip shared only after a successful native share operation. Browser permissions and chosen destination remain under the owner's control. No automatic posting, social account integration or approval queue is added.
 
+## Publishing (self-hosted Postiz)
+
+Owner routes, all scoped to the signed-in owner's shop. They exist only when the API has `POSTIZ_URL`, `POSTIZ_JWT_SECRET` and `PUBLISHING_SECRET`; otherwise `GET /publishing/accounts` returns `{ configured: false }` and the other routes answer 503 `publishing_unconfigured`.
+
+```text
+GET    /publishing/accounts                       -> { configured, providers: [{id,label}], accounts: Account[], connect_completed_at }
+POST   /publishing/accounts/connect               { provider }        -> { url, provider }   (send the browser to url)
+POST   /publishing/accounts/:id/reconnect         { provider }        -> { url, provider }
+DELETE /publishing/accounts/:id                                       -> { ok: true }        (queued posts to it are cancelled)
+POST   /publishing/webhooks/connected             { params }          -> { ok: true }        (called by Postiz; JWT signed with its secret)
+POST   /clips/:id/publish                         { account_ids, schedule_at?, idempotency_key } -> Publication (201 new, 200 repeated)
+GET    /clips/:id/publications                                        -> { publications: Publication[] }
+GET    /publications/:id                                              -> Publication
+POST   /publications/:id/cancel                                       -> Publication        (409 nothing_to_cancel once final)
+```
+
+`Account` is `{ id, provider, provider_label, name, profile, picture, disabled }`; `disabled` means the platform authorization must be renewed. `Publication` is `{ id, clip_id, kind: "now"|"schedule", scheduled_at, requested_at, timezone, caption, state, late, cancel_requested, channels: [{ account_id, provider, provider_label, name, state, live_url, error, updated_at }], last_error, created_at, updated_at }`. Publication states: `preparing`, `sending`, `queued`, `uncertain`, `published`, `partial`, `failed`, `cancelled`. Channel states: `pending`, `queued`, `uncertain`, `published`, `failed`, `cancelled`.
+
+The caption published is the clip's saved caption at the time of the request. `schedule_at` is an ISO instant at least two minutes ahead and within 90 days; the API keeps the owner's minute and gives each publication a distinct second. The publication ID derives from the shop and `idempotency_key`, so a repeated request returns the existing record. Outcomes come from polling Postiz (on reads that find a stale active record, and from the maintenance tick); an unanswered send is reconciled by exact time and channel before anything is sent again. Responses never contain organization keys. Firestore holds `cs2_publishing_orgs` (one per shop, key encrypted with `PUBLISHING_SECRET`) and `cs2_publications`.
+
+Deleting a clip cancels its queued posts; already published posts and the media copy inside Postiz remain. Errors: `provider_unavailable`, `account_missing`, `account_disabled`, `accounts_missing`, `invalid_accounts`, `invalid_schedule`, `publication_missing`, `nothing_to_cancel`, `publishing_busy`, `publishing_unavailable`, `publishing_unconfigured`.
+
 ## Worker
 
 ```text

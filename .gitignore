@@ -18,3 +18,8 @@ __pycache__/
 .firebase/
 *-debug.log
 wall-app/build-device/
+
+# Postiz self-hosting: local secrets and state
+postiz/.env
+postiz/postiz.env
+postiz/backups/

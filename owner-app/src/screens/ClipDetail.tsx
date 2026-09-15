@@ -5,12 +5,17 @@ import { Button } from '../components/Button';
 import { placeholderLabel } from '../components/ClipCard';
 import { Sheet } from '../components/Sheet';
 import { StripedPanel } from '../components/StripedPanel';
+import { PublicationList, PublishSheet } from '../components/PublishPanel';
 import { useClipShare } from '../hooks/useClipShare';
+import { usePublications } from '../hooks/usePublications';
+import { useShopTimezone } from '../hooks/useSession';
 import { useToast } from '../hooks/useToast';
-import { fmtDuration } from '../lib/format';
+import { fmtDuration, whenLabel } from '../lib/format';
 import { downloadClip } from '../lib/share';
 import { st, stripeFor } from '../lib/style';
 import { R, navigate, replace } from '../router';
+
+const PUBLISH_BTN = 'height:56px;border-radius:14px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.08);color:#F2EFE9;font-size:17px;font-weight:600';
 
 const REASONS: { label: string; code: string }[] = [
   { label: 'Wrong moment', code: 'wrong_moment' },
@@ -21,9 +26,11 @@ const REASONS: { label: string; code: string }[] = [
 export function ClipDetail({ id }: { id: string }) {
   const toast = useToast();
   const sharing = useClipShare();
+  const timezone = useShopTimezone();
+  const publishing = usePublications(id);
   const [clip, setClip] = useState<Clip | null>(null);
   const [caption, setCaption] = useState('');
-  const [sheet, setSheet] = useState<'delete' | 'report' | null>(null);
+  const [sheet, setSheet] = useState<'delete' | 'report' | 'publish' | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -139,6 +146,10 @@ export function ClipDetail({ id }: { id: string }) {
   };
 
   const stripe = clip ? stripeFor(clip.id) : undefined;
+  const overview = publishing.overview;
+  const publishLabel = !overview?.configured ? null : overview.accounts.length ? 'Publish' : 'Connect an account to publish';
+  const hasQueued = !!publishing.publications?.some((p) => p.channels.some((c) => c.state === 'queued' || c.state === 'pending' || c.state === 'uncertain'));
+  const hasPublished = !!publishing.publications?.some((p) => p.channels.some((c) => c.state === 'published'));
 
   return (
     <div style={st('flex:1;display:flex;flex-direction:column;background:#0E0D0C;color:#F2EFE9')}>
@@ -196,9 +207,20 @@ export function ClipDetail({ id }: { id: string }) {
             style={st('height:48px;border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:0 14px;background:rgba(255,255,255,.06);color:#F2EFE9;font:400 16px Outfit,system-ui,sans-serif;width:100%')}
           />
         </div>
+        {publishLabel && (
+          <Button
+            variant="ghostDark"
+            style={st(PUBLISH_BTN)}
+            disabled={!clip}
+            onClick={() => (overview?.accounts.length ? setSheet('publish') : navigate(R.accounts))}
+          >
+            {publishLabel}
+          </Button>
+        )}
         <Button variant="primaryAmber" onClick={() => clip && void sharing.share(clip)} disabled={!clip || sharing.busy}>
           {sharing.label(id)}
         </Button>
+        {publishing.publications && <PublicationList publications={publishing.publications} timezone={timezone} cancelling={publishing.cancelling} onCancel={(p) => void publishing.cancel(p)} />}
         <div style={st('display:flex;gap:8px')}>
           <Button variant="ghostDark" onClick={() => void download()}>
             Download
@@ -221,6 +243,8 @@ export function ClipDetail({ id }: { id: string }) {
             <div style={st('font-size:22px;font-weight:600')}>Delete forever?</div>
             <div style={st('font-size:15px;color:#3F3C37;line-height:1.45')}>
               This removes the clip and the {clip?.source_seconds ?? 0} seconds of footage it came from. It can't be recovered.
+              {hasQueued ? ' Scheduled posts of this clip are cancelled.' : ''}
+              {hasPublished ? ' Posts already published stay on your accounts.' : ''}
             </div>
           </div>
           <Button variant="danger" onClick={() => void confirmDelete()} disabled={busy}>
@@ -230,6 +254,21 @@ export function ClipDetail({ id }: { id: string }) {
             Keep it
           </Button>
         </Sheet>
+      )}
+
+      {sheet === 'publish' && clip && overview && (
+        <PublishSheet
+          clip={{ ...clip, caption: clip.caption }}
+          overview={overview}
+          timezone={timezone}
+          onClose={() => setSheet(null)}
+          onConnect={() => navigate(R.accounts)}
+          onPublished={(p) => {
+            publishing.upsert(p);
+            setSheet(null);
+            toast(p.state === 'failed' ? 'Not published. See details below.' : p.kind === 'schedule' ? `Scheduled for ${whenLabel(p.scheduled_at, timezone, { at: true })}.` : 'Publishing now.');
+          }}
+        />
       )}
 
       {sheet === 'report' && (

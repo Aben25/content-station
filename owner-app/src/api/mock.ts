@@ -15,6 +15,10 @@ import {
   type PauseMode,
   type PauseUntil,
   type Preview,
+  type Publication,
+  type PublishInput,
+  type PublishingAccount,
+  type PublishingOverview,
   type ReferenceFrame,
   type Session,
   type Shop,
@@ -136,6 +140,9 @@ export class MockApi implements Api {
   private pair: { token: string; started: number; ssid: string } | null = null;
   private store: MockClip[];
   private bootedAt = Date.now();
+  // Sample publishing data. Nothing here reaches a social platform.
+  private accounts: PublishingAccount[] = [];
+  private publications: Publication[] = [];
 
   constructor(variant: MockVariant) {
     this.variant = variant;
@@ -152,6 +159,9 @@ export class MockApi implements Api {
       this.pauseState = { mode: '1h', until: new Date(Date.now() + 3_600_000).toISOString() };
     }
     this.store = seedClips(variant === 'empty');
+    if (variant !== 'fresh' && variant !== 'empty') {
+      this.accounts = [{ id: 'acct-fb', provider: 'facebook', provider_label: 'Facebook Page', name: 'Fade Society', profile: null, picture: null, disabled: false }];
+    }
   }
 
   private read(key: string): string | null {
@@ -447,6 +457,100 @@ export class MockApi implements Api {
     await delay(LATENCY);
     this.requireSession();
     this.find(id).deleted = true;
+  }
+
+  async publishingAccounts(): Promise<PublishingOverview> {
+    await delay(LATENCY);
+    this.requireSession();
+    return { configured: true, providers: [{ id: 'facebook', label: 'Facebook Page' }, { id: 'instagram', label: 'Instagram' }], accounts: this.accounts.map((a) => ({ ...a })) };
+  }
+
+  // The demo skips the platform login and lands back on the accounts screen as a real connection would.
+  async connectAccount(provider: string): Promise<{ url: string; provider: string }> {
+    await delay(LATENCY);
+    this.requireSession();
+    const label = provider === 'instagram' ? 'Instagram' : 'Facebook Page';
+    const name = provider === 'instagram' ? '@fadesociety' : 'Fade Society';
+    if (!this.accounts.some((a) => a.provider === provider)) this.accounts.push({ id: `acct-${provider}`, provider, provider_label: label, name, profile: null, picture: null, disabled: false });
+    for (const a of this.accounts) if (a.provider === provider) a.disabled = false;
+    return { url: `${location.origin}${location.pathname}${location.search}#/accounts?added=${provider}&msg=Channel%20Added`, provider };
+  }
+
+  async reconnectAccount(id: string, provider: string): Promise<{ url: string; provider: string }> {
+    const a = this.accounts.find((x) => x.id === id);
+    if (!a) throw new ApiError('account_missing', 'That account is not connected to your shop.', 404);
+    return this.connectAccount(provider);
+  }
+
+  async disconnectAccount(id: string): Promise<void> {
+    await delay(LATENCY);
+    this.requireSession();
+    if (!this.accounts.some((a) => a.id === id)) throw new ApiError('account_missing', 'That account is not connected to your shop.', 404);
+    this.accounts = this.accounts.filter((a) => a.id !== id);
+    for (const p of this.publications) for (const c of p.channels) if (c.account_id === id && (c.state === 'queued' || c.state === 'pending')) { c.state = 'cancelled'; c.error = 'The account was disconnected.'; }
+  }
+
+  async publishClip(id: string, input: PublishInput): Promise<Publication> {
+    await delay(LATENCY);
+    this.requireSession();
+    const clip = this.find(id);
+    const existing = this.publications.find((p) => p.id === `pub-${input.idempotency_key}`);
+    if (existing) return structuredClone(existing);
+    if (!input.account_ids.length) throw new ApiError('invalid_accounts', 'Choose between one and 5 accounts.', 400);
+    const chosen = input.account_ids.map((aid) => {
+      const a = this.accounts.find((x) => x.id === aid);
+      if (!a) throw new ApiError('account_missing', 'One of the chosen accounts is not connected to your shop.', 404);
+      if (a.disabled) throw new ApiError('account_disabled', `${a.name} needs to be reconnected first.`, 409);
+      return a;
+    });
+    const now = new Date().toISOString();
+    const when = input.schedule_at ?? new Date(Date.now() + 30_000).toISOString();
+    const pub: Publication = {
+      id: `pub-${input.idempotency_key}`, clip_id: id, kind: input.schedule_at ? 'schedule' : 'now', scheduled_at: when, requested_at: input.schedule_at ?? null,
+      timezone: this.tz(), caption: clip.caption, state: 'queued', late: false, cancel_requested: false, last_error: null, created_at: now, updated_at: now,
+      channels: chosen.map((a) => ({ account_id: a.id, provider: a.provider, provider_label: a.provider_label, name: a.name, state: 'queued', live_url: null, error: null, updated_at: now })),
+    };
+    this.publications.unshift(pub);
+    return structuredClone(pub);
+  }
+
+  private settle(p: Publication): void {
+    if (p.state !== 'queued' || Date.parse(p.scheduled_at) > Date.now()) return;
+    // Sample outcome: the post is "published" a few seconds after its time. Not a real platform result.
+    const stamp = new Date().toISOString();
+    for (const c of p.channels) if (c.state === 'queued') { c.state = 'published'; c.live_url = c.provider === 'instagram' ? 'https://www.instagram.com/' : 'https://www.facebook.com/'; c.updated_at = stamp; }
+    const states = p.channels.map((c) => c.state);
+    p.state = states.every((x) => x === 'published') ? 'published' : states.some((x) => x === 'published') ? 'partial' : 'cancelled';
+    p.updated_at = stamp;
+  }
+
+  async clipPublications(id: string): Promise<Publication[]> {
+    await delay(60);
+    this.requireSession();
+    const list = this.publications.filter((p) => p.clip_id === id);
+    list.forEach((p) => this.settle(p));
+    return structuredClone(list);
+  }
+
+  async publication(id: string): Promise<Publication> {
+    await delay(60);
+    this.requireSession();
+    const p = this.publications.find((x) => x.id === id);
+    if (!p) throw new ApiError('publication_missing', 'This publication was not found.', 404);
+    this.settle(p);
+    return structuredClone(p);
+  }
+
+  async cancelPublication(id: string): Promise<Publication> {
+    await delay(LATENCY);
+    const p = await this.publication(id);
+    const live = this.publications.find((x) => x.id === id)!;
+    if (!live.channels.some((c) => c.state === 'queued' || c.state === 'pending' || c.state === 'uncertain')) throw new ApiError('nothing_to_cancel', p.state === 'published' ? 'This clip was already published.' : 'There is nothing left to cancel.', 409);
+    const stamp = new Date().toISOString();
+    for (const c of live.channels) if (c.state === 'queued' || c.state === 'pending' || c.state === 'uncertain') { c.state = 'cancelled'; c.updated_at = stamp; }
+    live.state = live.channels.some((c) => c.state === 'published') ? 'partial' : 'cancelled';
+    live.updated_at = stamp;
+    return structuredClone(live);
   }
 
   async suggestHours(name: string, _type: ShopType): Promise<HoursSuggestion> {
