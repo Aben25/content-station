@@ -58,6 +58,8 @@ Camera version 1.0.0 build 9 is uploaded and accepted for internal TestFlight te
 
 ## Remaining pilot validation
 
-Physical iPhone pairing/capture, Wi-Fi loss/recovery, app restarts and thermal behavior still need a handset test. Daily clip SMS is intentionally in dry-run mode; real carrier sign-in delivery and notification delivery have not been tested. Motion selection demonstrates the connected pipeline, not semantic editorial quality. Automatic face blurring, automatic social posting, team management and billing are not implemented.
+Physical pairing and capture were subsequently verified on an iPhone 15 Pro Max (`iPhone16,2`), build 9, after the owner reported the live preview working. Pair claim succeeded at 2026-09-15 01:38:35 UTC. The camera reported strong Wi-Fi, nominal temperature, saved framing and recording mode. Three real camera segments reached the server by 01:41:53 UTC. The first segment produced a 12-second, 1080×1920 clip at 01:42:25 UTC; downloading and fully decoding that private output passed at 01:43:25 UTC. The footage remains private and is not included in the repository.
+
+Wi-Fi loss/recovery, app restarts, switching networks and thermal behavior still need handset tests. Daily clip SMS is intentionally in dry-run mode; real carrier sign-in delivery and notification delivery have not been tested. Motion selection demonstrates the connected pipeline, not semantic editorial quality. Automatic face blurring, automatic social posting, team management and billing are not implemented.
 
 Secrets, test login codes, signed credentials, raw build logs and resumable camera tokens remain in ignored local configuration or Secret Manager. They are not part of this report or the published branch.
