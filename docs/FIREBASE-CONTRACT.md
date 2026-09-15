@@ -1,6 +1,6 @@
 # Active Firebase contract
 
-The user requested Firebase/Google on 2026-09-14. This supersedes backend/authentication/engine sections of the original Supabase `CONTRACT.md`. The visual handoff is unchanged.
+The user requested Firebase/Google on 2026-09-14. This supersedes the backend/authentication/engine sections of the original Supabase contract, archived at [archive/SUPABASE-CONTRACT.md](archive/SUPABASE-CONTRACT.md). The visual handoff is unchanged.
 
 ## Base URLs and authentication
 

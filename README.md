@@ -1,10 +1,10 @@
 # ContentStation
 
-**Continuing this project? Start with [the current handoff and next-work plan](HANDOFF-PLAN.md).** It records the deployed Firebase system, verified camera flow, remaining pilot checks and planned self-hosted Postiz integration. The active branch is `codex/connect-v2`.
+**Continuing this project? Start with [the current handoff and next-work plan](HANDOFF-PLAN.md), then [the architecture and code map](docs/ARCHITECTURE.md).** It records the deployed Firebase system, verified camera flow, remaining pilot checks and planned self-hosted Postiz integration. The active branch is `codex/connect-v2`.
 
 A mounted iPhone captures shop work, an OpenShorts worker makes vertical clips, and the owner views, edits captions, shares, or deletes them in a mobile website. The design matches the supplied Scope and visual direction handoff.
 
-The active implementation uses **Firebase Authentication, Firestore and private Cloud Storage**, a Node API suitable for Google Cloud Run, and the real pinned OpenShorts renderer. `supabase/` remains an unused reference from the initial v2 branch. It is not needed to run this system.
+The active implementation uses **Firebase Authentication, Firestore and private Cloud Storage**, a Node API suitable for Google Cloud Run, and the real pinned OpenShorts renderer. The first Supabase prototype was removed from the tree; its contract is archived in [docs/archive](docs/archive/SUPABASE-CONTRACT.md) and the code is in git history (`ec404bd`). See [docs/README.md](docs/README.md) for the documentation map.
 
 ## Run locally
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { OnboardingStep } from './api/types';
 
-// Hash routes from docs/CONTRACT.md section 8.
+// Hash routes from the archived docs/archive/SUPABASE-CONTRACT.md section 8, plus /accounts.
 export const R = {
   start: '/start',
   code: '/code',

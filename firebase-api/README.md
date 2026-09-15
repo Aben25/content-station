@@ -1,6 +1,6 @@
 # Firebase API
 
-Node 22+, Firebase Admin, Fastify. This replaces the legacy Supabase API surface. It uses the real Auth, Firestore and Storage emulators locally; there is no in-memory database substitute. Run from the repository root:
+Node 22+, Firebase Admin, Fastify. It uses the real Auth, Firestore and Storage emulators locally; there is no in-memory database substitute. `src/app.ts` composes `src/context.ts` (Firebase clients, secrets, shared authorization and presentation helpers) with one module per route group in `src/routes/`; pure helpers live in `src/lib/`. Run from the repository root:
 
 ```sh
 npm --prefix firebase-api ci
@@ -26,7 +26,7 @@ Deletion tombstones the clip and source and cancels the source job before touchi
 
 ## Publishing
 
-Set `POSTIZ_URL` (the instance API base, `.../api` on the container's port), `POSTIZ_JWT_SECRET` (that instance's `JWT_SECRET`) and `PUBLISHING_SECRET` (32+ characters, encrypts per-shop organization keys in Firestore) to enable owner-approved publishing; `POSTIZ_PROVIDERS` defaults to `facebook,instagram` and `OWNER_APP_URL` is where the platform login returns. Leave them unset to keep publishing hidden. `src/postiz.ts` is the client, `src/publishing.ts` the routes; `docs/FIREBASE-CONTRACT.md` has the shapes and `postiz/README.md` the instance details.
+Set `POSTIZ_URL` (the instance API base, `.../api` on the container's port), `POSTIZ_JWT_SECRET` (that instance's `JWT_SECRET`) and `PUBLISHING_SECRET` (32+ characters, encrypts per-shop organization keys in Firestore) to enable owner-approved publishing; `POSTIZ_PROVIDERS` defaults to `facebook,instagram` and `OWNER_APP_URL` is where the platform login returns. Leave them unset to keep publishing hidden. `src/postiz.ts` is the client, `src/routes/publishing.ts` the routes; `docs/FIREBASE-CONTRACT.md` has the shapes and `postiz/README.md` the instance details.
 
 `test/publishing.test.ts` uses `test/fake-postiz.ts`, an in-process mock of the Postiz routes with failure modes for timeouts, outages and rejections. It proves the API's behaviour around the contract, not platform acceptance. `scripts/postiz-local.mjs verify` exercises the real pinned instance.
 

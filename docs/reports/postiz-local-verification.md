@@ -33,7 +33,7 @@ The report with organization IDs (no keys) is written to `.runtime/postiz-verify
 
 ## ContentStation API
 
-`firebase-api/test/publishing.test.ts` runs against the emulators and `firebase-api/test/fake-postiz.ts`, an in-process mock of the routes above with controllable failure modes. All 8 tests pass, and the existing 16 API tests still pass (24 total, `npm --prefix firebase-api test`). Covered:
+`firebase-api/test/publishing.test.ts` (routes in `firebase-api/src/routes/publishing.ts`) runs against the emulators and `firebase-api/test/fake-postiz.ts`, an in-process mock of the routes above with controllable failure modes. All 8 tests pass, and the existing 16 API tests still pass (24 total, `npm --prefix firebase-api test`). Covered:
 
 - Publishing hidden and actions refused when `POSTIZ_URL` is unset.
 - One organization per shop; a second connect reuses it; the stored key is encrypted (`api_key_enc`) and never appears in responses; the completion webhook is rejected with another signature and accepted with the instance signature.

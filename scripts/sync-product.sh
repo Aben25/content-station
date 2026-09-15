@@ -4,8 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/product.json"
 
-mkdir -p "$ROOT/supabase/functions/_shared" "$ROOT/owner-app/src" "$ROOT/wall-app/Sources/Generated"
-cp "$SRC" "$ROOT/supabase/functions/_shared/product.json"
+mkdir -p "$ROOT/owner-app/src" "$ROOT/wall-app/Sources/Generated"
 cp "$SRC" "$ROOT/owner-app/src/product.json"
 
 node - "$SRC" "$ROOT/wall-app/Sources/Generated/Product.swift" <<'JS'

@@ -5,8 +5,6 @@ dist/
 !.env.example
 .DS_Store
 *.log
-supabase/.temp/
-supabase/.branches/
 wall-app/*.xcodeproj/xcuserdata/
 wall-app/*.xcodeproj/project.xcworkspace/xcuserdata/
 wall-app/build/

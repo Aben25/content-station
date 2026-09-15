@@ -1,6 +1,6 @@
 # Self-hosted Postiz for ContentStation
 
-ContentStation publishes owner-approved clips through [Postiz](https://github.com/gitroomhq/postiz-app), an open-source social publishing service, run as a separate service with one Postiz organization per shop. This directory holds the pinned deployment definition and the operating notes. The ContentStation API integration lives in `firebase-api/src/postiz.ts` and `firebase-api/src/publishing.ts`.
+ContentStation publishes owner-approved clips through [Postiz](https://github.com/gitroomhq/postiz-app), an open-source social publishing service, run as a separate service with one Postiz organization per shop. This directory holds the pinned deployment definition and the operating notes. The ContentStation API integration lives in `firebase-api/src/postiz.ts` and `firebase-api/src/routes/publishing.ts`.
 
 ## Pin
 

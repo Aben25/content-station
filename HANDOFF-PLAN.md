@@ -1,6 +1,6 @@
 # ContentStation: next-agent handoff and implementation plan
 
-Updated September 14, 2026, Pacific time (September 15 UTC), after the local Postiz integration pass. Baseline application commit: the commit that introduced `postiz/` and `firebase-api/src/publishing.ts` (see `git log`); the previous baseline was `adeeb98afe0942bdad536400b29e0b29db7194df`.
+Updated September 14, 2026, Pacific time (September 15 UTC), after the local Postiz integration pass. Baseline application commit: `9547b51` (Postiz publishing) plus the September 15 cleanup commit that split the API into modules (see `git log`); the previous baseline was `adeeb98afe0942bdad536400b29e0b29db7194df`.
 
 ## Start here
 
@@ -52,21 +52,21 @@ Remaining product validation: useful editorial selection on real shop footage; W
 
 | Work | Start with |
 | --- | --- |
-| API and ownership checks | [firebase-api/src/app.ts](firebase-api/src/app.ts), especially `ownerShop`, `ownedClip`, and media routes |
+| API and ownership checks | [firebase-api/src/context.ts](firebase-api/src/context.ts) (`ownerShop`, `ownedClip`, capabilities) and the route modules in [firebase-api/src/routes/](firebase-api/src/routes/); map in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | Owner API contract and adapter | [Api.ts](owner-app/src/api/Api.ts), [types.ts](owner-app/src/api/types.ts), [firebase.ts](owner-app/src/api/firebase.ts) |
 | Owner publishing screens | [Accounts.tsx](owner-app/src/screens/Accounts.tsx), [PublishPanel.tsx](owner-app/src/components/PublishPanel.tsx), [usePublications.ts](owner-app/src/hooks/usePublications.ts), [ClipDetail.tsx](owner-app/src/screens/ClipDetail.tsx), [Settings.tsx](owner-app/src/screens/Settings.tsx) |
-| Publishing backend | [postiz.ts](firebase-api/src/postiz.ts) (client, key vault), [publishing.ts](firebase-api/src/publishing.ts) (routes, reconciliation), [fake-postiz.ts](firebase-api/test/fake-postiz.ts) and [publishing.test.ts](firebase-api/test/publishing.test.ts) |
+| Publishing backend | [postiz.ts](firebase-api/src/postiz.ts) (client, key vault), [routes/publishing.ts](firebase-api/src/routes/publishing.ts) (routes, reconciliation), [fake-postiz.ts](firebase-api/test/fake-postiz.ts) and [publishing.test.ts](firebase-api/test/publishing.test.ts) |
 | Postiz stack | [postiz/README.md](postiz/README.md), `postiz/docker-compose.yml`, `scripts/postiz-local.mjs` |
 | Login behavior | [firebaseAuth.ts](owner-app/src/api/firebaseAuth.ts) and its tests |
 | Native camera | [wall-app/README.md](wall-app/README.md), `wall-app/ContentStationWall.xcodeproj` |
 | Clip processing | [engine-worker/README.md](engine-worker/README.md), [contentstation_worker.py](engine-worker/contentstation_worker.py) |
 | Deployed configuration | [docs/HOSTED-SETUP.md](docs/HOSTED-SETUP.md), `deploy/`, `firebase.hosted.json` |
 | Local launcher and verification | `scripts/local.mjs`, `scripts/smoke-e2e.py`, `scripts/smoke-hosted.mjs` |
-| Shared camera/owner contract | [docs/CONTRACT.md](docs/CONTRACT.md); Firebase code supersedes legacy Supabase auth details |
+| Shared camera/owner contract | [docs/FIREBASE-CONTRACT.md](docs/FIREBASE-CONTRACT.md); field shapes also in the archived [Supabase contract](docs/archive/SUPABASE-CONTRACT.md) |
 | Visual references | [design README](docs/handoff/design/README.md), [interactive board](docs/handoff/design/ContentStationBoard.jsx) |
 | Product name and URLs | `product.json`, propagated by `scripts/sync-product.sh` |
 
-`supabase/` is an unused reference. It is not the running backend.
+The Supabase prototype directory was removed on September 15, 2026 (git history `ec404bd` keeps it); `docs/archive/` holds its contract and the early plans.
 
 ## Publishing: what is done and what remains
 
