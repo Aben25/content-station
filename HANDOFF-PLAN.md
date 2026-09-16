@@ -1,21 +1,32 @@
 # ContentStation: next-agent handoff and implementation plan
 
-Updated September 14, 2026, Pacific time (September 15 UTC), after the local Postiz integration pass. Baseline application commit: `9547b51` (Postiz publishing) plus the September 15 cleanup commit that split the API into modules (see `git log`); the previous baseline was `adeeb98afe0942bdad536400b29e0b29db7194df`.
+Updated September 15, 2026, Pacific time, for the repository cleanup built on Clip Lab commit `7b40583`. This revision contains the cleanup and next-agent handoff. The deployment and Postiz evidence below comes from earlier dated verification and was not rerun for this cleanup. No cloud deployment or TestFlight upload accompanied these source changes.
 
 ## Start here
 
-Continue from **`codex/connect-v2`** in [Aben25/content-station](https://github.com/Aben25/content-station/tree/codex/connect-v2). This branch contains the owner website, native camera app, Firebase API, OpenShorts worker, deployment configuration, design references and verification reports. `contentstation-v2` is the earlier imported codebase; `main` is the old system. The v2 history is unrelated to `main`. Use the current branch as the base for follow-up work; this handoff does not merge or replace GitHub `main`.
+Continue from **`main`** in [Aben25/content-station](https://github.com/Aben25/content-station/tree/main). It contains the v2 owner website, native camera app, Firebase API, OpenShorts worker, Clip Lab, deployment configuration and current documentation. The cleanup advances `main` from `7b40583`; `codex/connect-v2` remains at that earlier Clip Lab commit and is not the branch to resume. The old system is preserved on **`main-old-system`** at `9f209d9`; its history is unrelated to the v2 history. The earlier promotion replaced the old `main` history rather than merging it. Keep the backup branch unless the user authorizes its removal. `contentstation-v2` is the earlier imported codebase.
 
-This document records the latest user direction and the next implementation plan. Read [README.md](README.md) for local setup and [docs/HOSTED-SETUP.md](docs/HOSTED-SETUP.md) for cloud operations. The [original design handoff](docs/handoff/HANDOFF.md) remains a visual reference, with superseded technical and product assumptions. Current code, the verification reports, and the user's later instructions take precedence over those assumptions.
+This document records the latest user direction and the next implementation plan. Read [README.md](README.md) for local setup and [docs/HOSTED-SETUP.md](docs/HOSTED-SETUP.md) for cloud operations. The current app source is the UI reference. Superseded design exports, prototype plans and resolved review reports were removed from this checkout; they remain available in Git history at `7b40583`.
+
+## Next-agent quick start
+
+- **Workspace:** `/Users/abeniforjesus/Desktop/ContentStationAI`, cloned from `Aben25/content-station`. Read `AGENTS.md`, this handoff and `docs/ARCHITECTURE.md`; fetch and inspect `main` before editing so later commits are included.
+- **Completed cleanup:** removed 21 obsolete prototype/design/plan/report files and the camera's unused Supabase key/header. Kept both current web UIs, their shared clipping engine, Firebase API, native camera, Postiz, tests and deployment files. Runtime UI and clipping behavior were preserved; explicit demo modes remain useful for development.
+- **Local readiness:** owner/API dependencies were installed and builds passed. OpenShorts is not installed in this checkout, and private footage, model keys and prior Postiz configuration were not cloned. Python 3.12 is available at `/opt/homebrew/bin/python3.12`; the shell's default `python3` is 3.9, so select 3.12 explicitly for renderer setup and Clip Lab.
+- **Suggested next work:** follow [Clip Lab setup](scripts/clip-lab/README.md). Install the pinned renderer with `PYTHON_BIN=/opt/homebrew/bin/python3.12 bash scripts/setup-openshorts.sh`, then launch `/opt/homebrew/bin/python3.12 scripts/clip-lab/server.py`. Validate a synthetic or user-authorized video in motion mode through upload, segmentation, rendering, playback and download. Record actual results before claiming full rendering works on this Mac.
+- **Further work:** a Postiz draft remains unverified through Clip Lab. Its CLI path is separate from the owner's Firebase/Postiz publishing path. Hosted Postiz and a Meta app remain product milestones; use the existing authorization boundaries below when that work is requested.
+- **Evidence:** see [Validation when resuming](#validation-when-resuming) for the checks passed during cleanup and the integration checks not repeated. The saved hosted/Postiz reports describe earlier runs, not the current Mac's installed services.
+
+## Product milestone
 
 **Current milestone:** physical iPhone capture → authenticated upload → Google Cloud OpenShorts render → owner playback works, and owner-approved publishing through self-hosted Postiz is implemented and verified locally (API, owner website, pinned instance). **Next milestone:** one real shop connects its social account on a hosted instance, approves a camera-generated clip, publishes from ContentStation, and sees the live post link.
 
-State of publishing: the pinned Postiz stack runs locally, the ContentStation API provisions one Postiz organization per shop and publishes through it, and the owner website has the connect/review/publish/schedule screens. **No Meta developer app exists, no hosted Postiz has been provisioned, no social account has been connected, and no social post has been sent.** In production the feature stays hidden until the API receives the `POSTIZ_*` secrets. See [the local verification report](docs/reports/postiz-local-verification.md).
+Last recorded publishing state: the pinned Postiz stack passed local verification in the prior environment, the ContentStation API provisions one Postiz organization per shop and publishes through it, and the owner website has the connect/review/publish/schedule screens. **That verification did not provision a Meta app or hosted Postiz, connect a real social account, or send a social post.** Check the current service state before continuing. In production the feature stays hidden until the API receives the `POSTIZ_*` secrets. See [the local verification report](docs/reports/postiz-local-verification.md).
 
 ## User direction and product scope
 
 - Use Firebase/Google. The user explicitly authorized replacing the old nonfunctional Content Station in project `lemekeru`; that deployment is complete.
-- Use the supplied owner/wall app visual design. The owner app remains a mobile website; the camera app is native iOS.
+- Preserve the current owner and camera UI. The owner app remains a mobile website; the camera app is native iOS. Clip Lab remains a separate local web UI for testing the shared clipping engine.
 - Reuse open-source software. The running renderer already uses real OpenShorts. The user prefers self-hosted, open-source **Postiz** for social publishing.
 - Proposed publishing architecture: one Postiz installation, with a separate Postiz organization for each ContentStation business. Keep business credentials and data separated on the server.
 - First publishing platforms: Instagram and Facebook. The owner reviews the video and caption, then explicitly publishes or schedules it. TikTok and YouTube follow after the first flow is proven.
@@ -36,14 +47,14 @@ State of publishing: the pinned Postiz stack runs locally, the ContentStation AP
 | Camera | `com.contentstation.station`, version 1.0.0 build 9, accepted in internal TestFlight |
 | Social publishing | Implemented behind configuration and verified locally; hidden on the hosted site until a Postiz instance and Meta app exist. Manual share/download works |
 
-On this handoff pass, the owner site returned HTTP 200 and API `/health` returned HTTP 200, `ok=true`, `project_id=lemekeru`, `emulator=false`, at **2026-09-15 02:17:38 UTC**. This is a reachability check, not a new end-to-end test.
+The prior handoff recorded the owner site returning HTTP 200 and API `/health` returning HTTP 200, `ok=true`, `project_id=lemekeru`, `emulator=false`, at **2026-09-15 02:17:38 UTC**. This was a reachability check, not a new end-to-end test, and was not repeated for the cleanup.
 
 Historical verification, with details in [hosted verification](docs/reports/hosted-verification.md):
 
 - A 58.9 MB, five-minute test upload produced a 30.03-second, 1080×1920 clip through the cloud worker. Full FFmpeg decoding, HTTP range playback, caption editing, duplicate segment completion and two-shop access isolation passed.
 - A separate generated fixture passed deletion and revocation of an already issued media URL. The isolation test checks two actual, distinct shops and the `clip_missing` error; an owner lacking a shop is not a valid isolation test.
 - A physical **iPhone 15 Pro Max**, build 9, paired at 2026-09-15 01:38:35 UTC. Preview, saved framing, recording and real uploads worked. Its first 12-second, 1080×1920 clip fully decoded at 01:43:25 UTC. The phone footage is private and excluded from Git.
-- Last recorded automated checks: 16 Firebase API tests, 24 owner tests, 15 Swift checks, plus API/owner builds, signed iOS archive/export, worker dependency checks and actual OpenShorts rendering. These were not rerun for this documentation-only handoff.
+- The hosted pass recorded 16 Firebase API tests, 24 owner tests and 15 Swift checks, plus builds and real rendering. The later Postiz pass recorded 24 API tests and 42 owner tests. These counts belong to their dated reports; they are not fresh deployment or hardware verification.
 - Hosted browser authentication passed sign-in, repeated resend, incorrect code, correct code, and sign-out using fictional test numbers. Real carrier SMS delivery has not been tested.
 
 Remaining product validation: useful editorial selection on real shop footage; Wi-Fi loss/recovery; switching networks; camera app restarts; thermal behavior. The station app must remain open for recording. Automatic face blurring, daily clip SMS delivery, team management, billing and unattended social posting are not implemented.
@@ -60,17 +71,18 @@ Remaining product validation: useful editorial selection on real shop footage; W
 | Login behavior | [firebaseAuth.ts](owner-app/src/api/firebaseAuth.ts) and its tests |
 | Native camera | [wall-app/README.md](wall-app/README.md), `wall-app/ContentStationWall.xcodeproj` |
 | Clip processing | [engine-worker/README.md](engine-worker/README.md), [contentstation_worker.py](engine-worker/contentstation_worker.py) |
+| Clip Lab web UI | [scripts/clip-lab/README.md](scripts/clip-lab/README.md), `server.py`, `index.html`, `gemini_cli_bridge.py`; run with `npm run clip-lab` |
 | Deployed configuration | [docs/HOSTED-SETUP.md](docs/HOSTED-SETUP.md), `deploy/`, `firebase.hosted.json` |
 | Local launcher and verification | `scripts/local.mjs`, `scripts/smoke-e2e.py`, `scripts/smoke-hosted.mjs` |
-| Shared camera/owner contract | [docs/FIREBASE-CONTRACT.md](docs/FIREBASE-CONTRACT.md); field shapes also in the archived [Supabase contract](docs/archive/SUPABASE-CONTRACT.md) |
-| Visual references | [design README](docs/handoff/design/README.md), [interactive board](docs/handoff/design/ContentStationBoard.jsx) |
+| Shared camera/owner contract | [docs/FIREBASE-CONTRACT.md](docs/FIREBASE-CONTRACT.md), owner `api/types.ts` and camera `Network/Models.swift` |
+| UI development | [owner-app/README.md](owner-app/README.md), `owner-app/src/`, `wall-app/Sources/UI/`, `scripts/clip-lab/index.html` |
 | Product name and URLs | `product.json`, propagated by `scripts/sync-product.sh` |
 
-The Supabase prototype directory was removed on September 15, 2026 (git history `ec404bd` keeps it); `docs/archive/` holds its contract and the early plans.
+The working tree contains the current Firebase implementation. Older systems and design exports are recoverable through Git history and `main-old-system`; they are not alternative runtime targets.
 
 ## Publishing: what is done and what remains
 
-Everything below was verified on September 14, 2026 (Pacific) on this Mac; details and limits are in [docs/reports/postiz-local-verification.md](docs/reports/postiz-local-verification.md).
+The completed steps below were verified on September 14, 2026 (Pacific) in the prior environment; details and limits are in [docs/reports/postiz-local-verification.md](docs/reports/postiz-local-verification.md).
 
 ### Done: pinned local stack and organization isolation (plan step 1)
 
@@ -137,25 +149,25 @@ Self-hosting removes the Postiz Cloud subscription, not infrastructure costs, ma
 - **Camera release:** current internal TestFlight build is 9, App Store Connect app `6793229212`, team `HP284BJ924`, group `Sutway`. App Store production release and external tester invitations have not been performed.
 - **Maintenance:** `SMS_MODE=dry-run` leaves daily clip texts unsent. Firebase phone sign-in is separate. Automatic face blurring is absent, so keep product copy truthful.
 - **Private diagnostics:** API request URLs can contain pairing tokens. Strip query strings and print explicit field allowlists instead of entire cloud logs, job documents, authentication records or device configurations.
-- **Docker on this Mac:** there is no Docker Desktop. `colima` (4 CPU, 8 GiB) provides the engine; `docker compose` needs `cliPluginsExtraDirs: ["/opt/homebrew/lib/docker/cli-plugins"]` in `~/.docker/config.json`. `colima start` after a reboot. The Postiz image is 5.6 GB.
-- **Firebase emulators for tests:** another project's emulators sit on the default ports on this Mac. `.runtime/firebase.emulators.json` (ignored) runs this repo's Auth/Firestore/Storage emulators on 19099/18080/19199 with copied rules; export the matching `*_EMULATOR_HOST` values before `npm --prefix firebase-api test`. OpenJDK 21 is installed where `scripts/local.mjs` looks for it.
+- **Local Docker:** the earlier Postiz verification used Colima with 4 CPU and 8 GiB. Confirm the current Docker engine before running the stack; the ignored instance configuration is not part of a clone. See [Postiz setup](postiz/README.md).
+- **Firebase emulators for tests:** check for port conflicts before starting the root emulator configuration. The earlier environment used an ignored alternate configuration on 19099/18080/19199; that file is not included in a clone. Export the matching `*_EMULATOR_HOST` values before `npm --prefix firebase-api test`.
 - **Postiz specifics:** `POSTIZ_URL` ends in `/api`; organization keys go in the `Authorization` header without `Bearer`; `API_LIMIT` is a per-IP hourly budget for the whole backend, so keep it high; drafts never contact a platform; cross-organization deletes answer 500, not 403.
 
 ## Local-only access and artifacts
 
-On the current Mac, this checkout is under `outputs/contentstation-v2` in the Codex workspace. Ignored `.runtime/` contains local configuration, test login codes, deployment helpers, credentials and private media; these are deliberately absent from GitHub.
+The current checkout is under `Desktop/ContentStationAI`. Private artifacts from the earlier environment are not included in a clone. Keep local state in the existing ignored locations:
 
-- `.runtime/deploy/test-phones.json`: fictional hosted-auth test codes used by `scripts/smoke-hosted.mjs`.
-- `.runtime/deploy/secrets.json`: local deployment secret material; hosted services use Secret Manager. Reuse or provision through authorized secret access without printing values.
-- `.runtime/hardware-test/`: private phone clip and validation result. Use only for the authorized test; never include footage in a public commit or demo without permission.
-- `.runtime/deploy/`: build 9 signed archive and IPA. The accepted build is available through TestFlight; archives/signing material are not repository deliverables.
-- `.runtime/cloud-sdk-venv/bin/python`: local Python with gcloud worker-pool dependencies. If the system gcloud Python reports missing grpc/cffi, use `CLOUDSDK_PYTHON_SITEPACKAGES=1` and this interpreter for that command.
-- Existing App Store Connect CLI credentials are in the Mac's `~/.asc/config.json`; read only the fields needed, without printing the file or signing keys.
-- `postiz/.env` and `postiz/postiz.env` (ignored): local database passwords and the local instance `JWT_SECRET`. `.runtime/postiz-verify.json` holds the last verify run with organization IDs only. Both are throwaway local values; the hosted instance gets its own.
+- `.runtime/local-env.json`, `.runtime/openshorts/` and `.runtime/jobs/`: local app configuration, pinned renderer and worker files created by setup.
+- `.runtime/clip-lab.env` and `.runtime/clip-lab/`: optional local model configuration and Clip Lab media/runs.
+- `.runtime/deploy/test-phones.json`: separately provisioned fictional hosted-auth test codes used by `scripts/smoke-hosted.mjs`.
+- `postiz/.env`, `postiz/postiz.env` and `postiz/backups/`: generated local Postiz secrets and state; hosted instances use their own configuration.
+- Private recordings, signing material and exported iOS archives: keep out of Git. Hosted services use Secret Manager; obtain credentials through authorized access without printing them.
 
 A fresh checkout can run locally via `npm run setup` and `npm run dev` using generated local secrets and Firebase emulators. Cloud administration, hosted fictional logins and signed iOS builds require separate authorized credentials. Missing ignored files are not missing source code.
 
 ## Validation when resuming
+
+The September 15 cleanup removed superseded design exports, plans and reports, plus the camera's unused Supabase configuration/header. Local checks passed: API TypeScript build, owner typecheck/production build and 42 tests, 12 worker tests, 15 Swift checks, and a Debug iOS simulator build. All local Markdown links, Python and Clip Lab JavaScript syntax, camera plist files, and Clip Lab HTTP UI/state serving were checked. No full render, Firebase emulator integration suite, cloud deployment, physical-device run or external publishing was repeated. The fresh checkout still needs OpenShorts setup for actual rendering.
 
 For documentation-only work, check links, diffs and accidental sensitive content. For implementation, run the affected tests and builds from the component READMEs. For publishing work: `node scripts/postiz-local.mjs up && node scripts/postiz-local.mjs verify`, `npm --prefix firebase-api test` (with emulators), `npm --prefix owner-app test && npm --prefix owner-app run typecheck && npm --prefix owner-app run build`. Use `scripts/smoke-e2e.py` for local real-render verification; it refuses hosted targets. The hosted smoke requires an explicit `--project lemekeru`, an authorized input file and local fictional test configuration. Its camera requests simulate a phone; cite the separate physical test for handset evidence.
 

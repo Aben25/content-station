@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { OnboardingStep } from './api/types';
 
-// Hash routes from the archived docs/archive/SUPABASE-CONTRACT.md section 8, plus /accounts.
+// Owner website hash routes; App.tsx maps these to the current screens.
 export const R = {
   start: '/start',
   code: '/code',

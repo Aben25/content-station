@@ -1,6 +1,6 @@
 # ContentStation wall app
 
-The iOS app that runs on an iPhone mounted permanently on a shop wall. It captures motion gated footage, uploads segments, reports health, and shows one full screen status at a time. Behavior follows `docs/CONTRACT.md` and `docs/handoff/HANDOFF.md`; visuals and copy follow `docs/handoff/design/project/Wall App.dc.html`.
+The current native iOS camera app. It captures motion-gated footage, uploads segments, reports health, and shows one full-screen status at a time. Integration behavior follows the [Firebase contract](../docs/FIREBASE-CONTRACT.md); the current visual implementation lives in `Sources/UI/` and `Sources/State/WallState.swift`.
 
 ## Generate and build
 
@@ -18,19 +18,18 @@ Target: `ContentStationWall`, bundle id `com.contentstation.station`, iOS 17.0, 
 
 ## API configuration
 
-The app requires `CS_API_BASE_URL`, the Firebase API / Cloud Run origin. No suffix is added. `CS_SUPABASE_ANON_KEY` is optional for a legacy backend. Configuration reads in this order:
+The app requires `CS_API_BASE_URL`, the Firebase API / Cloud Run origin. No suffix is added. Pairing supplies the device JWT used for authenticated requests. Configuration reads in this order:
 
-1. `Resources/Config.plist`, keys `CS_API_BASE_URL` and `CS_SUPABASE_ANON_KEY`. Empty values are skipped.
-2. `Info.plist`, same keys, filled from the build settings in `Config.xcconfig`.
+1. `Resources/Config.plist`, key `CS_API_BASE_URL`. Empty values are skipped.
+2. `Info.plist`, the same key, filled from the build setting in `Config.xcconfig`.
 
 The simplest path is to edit `Config.xcconfig`:
 
 ```
 CS_API_BASE_URL = https:/$()/YOUR-SERVICE.run.app
-CS_SUPABASE_ANON_KEY =
 ```
 
-The `$()` after `https:/` keeps xcconfig from reading `//` as a comment. Both values can also be passed on the command line: `xcodebuild ... CS_API_BASE_URL=... CS_SUPABASE_ANON_KEY=...`.
+The `$()` after `https:/` keeps xcconfig from reading `//` as a comment. The value can also be passed on the command line: `xcodebuild ... CS_API_BASE_URL=...`.
 
 Product strings and timing constants come from `Sources/Generated/Product.swift`, written by `scripts/sync-product.sh` from `product.json`. Never edit it by hand.
 
@@ -47,7 +46,7 @@ In Xcode, Product > Scheme > Edit Scheme > Run > Arguments has one disabled entr
 xcrun simctl launch booted com.contentstation.station -CS_PREVIEW_STATE recording
 ```
 
-Preview states fill in sample values (short code 4KP7, network "Fade Society", "Paused until 3:00 PM") so the screens match the design file.
+Preview states fill in sample values (short code 4KP7, network "Fade Society", "Paused until 3:00 PM") for testing the current screens without a device or backend.
 
 ## Where things live
 
@@ -61,28 +60,18 @@ Preview states fill in sample values (short code 4KP7, network "Fade Society", "
 
 Segments are written to `Application Support/ContentStationWall/segments`. The upload queue is `uploads.json` next to it, the last Config is `config.json`, the drift reference is `reference.luma`. Credentials live in the Keychain, so a power cut or reinstall resumes without pairing again.
 
-## Device setup checklist (MDM and Single App Mode)
+## Physical device status
 
-From HANDOFF section 3. Every wall phone must be:
+Build 9 was accepted in internal TestFlight and tested on an iPhone 15 Pro Max. Pairing, preview, saved framing, recording, upload and cloud rendering produced a fully decoded vertical clip. See the dated [hosted verification report](../docs/reports/hosted-verification.md); a new simulator build does not repeat that hardware verification.
 
-1. iPhone 12 or newer.
-2. Supervised through Apple Business Manager, added with Apple Configurator.
-3. Enrolled in the MDM (Mosyle, Hexnode, or Miradore, still to be decided) with Single App Mode locked to `com.contentstation.station`. This is what relaunches the app after a power cut or crash.
-4. Passcode off.
-5. Auto lock off (the app also disables the idle timer and sets brightness to zero on launch and on every return to foreground).
-6. iOS automatic updates blocked.
-7. Camera permission granted. The app asks on first launch; the MDM profile can pre-approve it.
-8. Wi-Fi joins happen through the app during pairing, which needs the `com.apple.developer.networking.HotspotConfiguration` entitlement enabled on the App ID in the developer portal.
+Keep the app open while recording and grant camera permission. During pairing, show the owner's QR on a second device and start about 1–2 feet away. Wi-Fi joining uses the `com.apple.developer.networking.HotspotConfiguration` entitlement. Managed-device enrollment and automatic relaunch are not established by the current verification.
 
-## Unverified on real hardware
+Remaining hardware checks:
 
-Everything below compiles and follows the contract, but has only been run in the simulator, which has no camera.
-
-- The full capture path: AVCaptureSession at 1920x1080 30 fps with the frames rotated to portrait, VideoToolbox H.264 encoding, the compressed pre roll ring, and the fragmented MP4 output through `AVAssetWriter` with `movieFragmentInterval`. Confirm a segment written on a phone plays after a forced crash.
+- Segment playback after a forced crash or restart, including queued upload recovery.
 - The 720p fallback at thermal serious and the automatic recovery from critical.
 - Motion gate thresholds (MAD over 6 on 32x32 luma) and the drift threshold (MAD over 28 on 64x64 luma) against real shop lighting.
-- `NEHotspotConfiguration` join, including the already associated case and open networks.
-- QR decoding at 6 to 8 feet with `videoZoomFactor` 2.0.
+- Wi-Fi loss/recovery, changing networks, and `NEHotspotConfiguration` behavior on open or already associated networks.
 - Background URLSession uploads, relaunch handling, and the BGProcessingTask for retries.
 - Exposure and white balance lock after framing.
 - Screen brightness at 0.0 stays legible up close on the actual panel.

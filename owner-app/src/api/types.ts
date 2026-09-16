@@ -1,4 +1,4 @@
-// JSON shapes from docs/FIREBASE-CONTRACT.md (and the archived docs/archive/SUPABASE-CONTRACT.md sections 2.1 and 3). Keep in sync with the backend.
+// JSON shapes from docs/FIREBASE-CONTRACT.md. Keep in sync with the backend.
 
 export type ShopType = 'barbershop' | 'detailing' | 'wrap' | 'tattoo' | 'other';
 

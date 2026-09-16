@@ -51,7 +51,6 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         ITSAppUsesNonExemptEncryption: false
         CS_API_BASE_URL: $(CS_API_BASE_URL)
-        CS_SUPABASE_ANON_KEY: $(CS_SUPABASE_ANON_KEY)
     entitlements:
       path: ContentStationWall.entitlements
       properties:

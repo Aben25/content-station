@@ -1,6 +1,6 @@
 # Active Firebase contract
 
-The user requested Firebase/Google on 2026-09-14. This supersedes the backend/authentication/engine sections of the original Supabase contract, archived at [archive/SUPABASE-CONTRACT.md](archive/SUPABASE-CONTRACT.md). The visual handoff is unchanged.
+This is the current contract for the Firebase API, owner website, iPhone camera and clipping worker. The owner interface and JSON types live in [Api.ts](../owner-app/src/api/Api.ts) and [types.ts](../owner-app/src/api/types.ts); camera wire models live in [Models.swift](../wall-app/Sources/Network/Models.swift).
 
 ## Base URLs and authentication
 
@@ -22,7 +22,7 @@ Config adds `reference_frame_revision: string | null`. It changes only when a ne
 
 Segment upload keeps the existing protocol: request upload URL with UTC `start_ts`/`end_ts`; PUT MP4 bytes; call complete with path, bytes, dimensions and fps. Completion verifies stored object metadata and creates one deterministic job per segment. Repeated completion returns the same segment/job IDs.
 
-Owner clips support caption edits, open/share/skip/report events, deletion and private media. Mark a clip shared only after a successful native share operation. Browser permissions and chosen destination remain under the owner's control. No automatic posting, social account integration or approval queue is added.
+Owner clips support caption edits, open/share/skip/report events, deletion and private media. Mark a clip shared only after a successful native share operation. Browser permissions and chosen destination remain under the owner's control. Configured Postiz accounts support owner-approved publishing and scheduling through the routes below; there is no unattended posting.
 
 ## Publishing (self-hosted Postiz)
 

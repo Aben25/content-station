@@ -1,5 +1,3 @@
 // Firebase/Cloud Run API origin. No route suffix is added.
 // Escape // as /$()/ in xcconfig values. Set CS_API_BASE_URL before use.
 CS_API_BASE_URL = https:/$()/contentstation-api-233122534259.us-central1.run.app
-// Optional compatibility header for a legacy backend only.
-CS_SUPABASE_ANON_KEY =

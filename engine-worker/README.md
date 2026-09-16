@@ -23,9 +23,7 @@ The test suite verifies selection bounds, rejected inputs, origin restrictions, 
 
 ## Clip Lab (local testing on long-form footage)
 
-`npm run clip-lab` serves a local page at `http://127.0.0.1:4320` for trying this renderer on your own footage. Upload a video or give a local path; Clip Lab splits it into camera-sized segments (2, 5 or 9 minutes), runs each through `OpenShortsRenderer` exactly as the worker does, and shows live stages, the engine log, a source timeline and the resulting clips. Captions can be edited, clips downloaded, or saved to Postiz as drafts through the Postiz CLI; drafts never publish. Runs are stored in `.runtime/clip-lab/`.
-
-AI mode needs `GEMINI_API_KEY`, from the shell or a git-ignored `.runtime/clip-lab.env` line `GEMINI_API_KEY=...`. Without a key, a signed-in Gemini CLI is used through a local bridge on port 4321, though Google currently rejects personal-account sign-ins for headless use. On macOS, install `brew install ffmpeg-full`: Homebrew's default `ffmpeg` lacks libass, and OpenShorts then ships clips without burned captions.
+`npm run clip-lab` serves a local page at `http://127.0.0.1:4320` for trying this renderer on uploaded or local footage. It splits long videos into camera-sized segments and imports this worker's `OpenShortsRenderer`. The current UI includes progress, logs, a source timeline, clip playback, caption editing, downloads and optional Postiz drafts. See [Clip Lab setup](../scripts/clip-lab/README.md) for Python/FFmpeg requirements, AI access, configuration and local storage.
 
 ## CPU container
 

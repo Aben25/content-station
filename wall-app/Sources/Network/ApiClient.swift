@@ -33,12 +33,11 @@ enum ApiError: Error, CustomStringConvertible {
 
 struct EmptyResponse: Decodable {}
 
-/// All device routes from the contract. Reads the base url and anon key from
+/// All device routes from the Firebase contract. Reads the base URL from
 /// Config.plist first, then Info.plist. Never logs the JWT, pair token, or
 /// Wi-Fi password.
 final class ApiClient {
     let baseURL: URL?
-    let anonKey: String
     let isMock: Bool
 
     /// Supplies the current device JWT for authenticated routes.
@@ -48,9 +47,7 @@ final class ApiClient {
     private let mock = MockApi()
 
     init(mock: Bool = LaunchArguments.mockApi) {
-        let values = ApiClient.loadConfiguration()
-        baseURL = values.baseURL.flatMap(URL.init(string:))
-        anonKey = values.anonKey
+        baseURL = ApiClient.loadBaseURL().flatMap(URL.init(string:))
         isMock = mock
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 40
@@ -137,7 +134,6 @@ final class ApiClient {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.timeoutInterval = timeout
-        if !anonKey.isEmpty { request.setValue(anonKey, forHTTPHeaderField: "apikey") }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if auth {
             guard let jwt = token ?? deviceJWT(), !jwt.isEmpty else { throw ApiError.unauthorized }
@@ -182,22 +178,17 @@ final class ApiClient {
         }
     }
 
-    private static func loadConfiguration() -> (baseURL: String?, anonKey: String) {
+    private static func loadBaseURL() -> String? {
         var baseURL: String?
-        var anonKey = ""
         if let url = Bundle.main.url(forResource: "Config", withExtension: "plist"),
            let dictionary = NSDictionary(contentsOf: url) as? [String: Any] {
             if let value = dictionary["CS_API_BASE_URL"] as? String, !value.isEmpty { baseURL = value }
-            if let value = dictionary["CS_SUPABASE_ANON_KEY"] as? String, !value.isEmpty { anonKey = value }
         }
         let info = Bundle.main.infoDictionary ?? [:]
         if baseURL == nil, let value = info["CS_API_BASE_URL"] as? String, !value.isEmpty, !value.contains("YOUR-PROJECT") {
             baseURL = value
         }
-        if anonKey.isEmpty, let value = info["CS_SUPABASE_ANON_KEY"] as? String, !value.isEmpty {
-            anonKey = value
-        }
-        return (baseURL, anonKey)
+        return baseURL
     }
 }
 

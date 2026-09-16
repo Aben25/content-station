@@ -1,6 +1,6 @@
 # Architecture and code map
 
-ContentStation is four runtime pieces and one shared contract. A mounted iPhone films the shop, a Node API on Cloud Run owns all data access, a Python worker renders vertical clips with OpenShorts, and a mobile website lets the owner review, share and publish. Publishing goes through a self-hosted Postiz instance, one organization per shop.
+ContentStation's connected flow has four runtime pieces and one shared contract. A mounted iPhone films the shop, a Node API on Cloud Run owns all data access, a Python worker renders vertical clips with OpenShorts, and a mobile website lets the owner review, share and publish. Publishing goes through a self-hosted Postiz instance, one organization per shop. Clip Lab is a separate local web UI that imports the same Python renderer to process files without Firebase or a paired camera.
 
 ```mermaid
 flowchart LR
@@ -43,10 +43,11 @@ flowchart LR
 | `owner-app/` | Owner website (below) | UI work |
 | `wall-app/` | Native iOS camera app: `Sources/App` (coordinator, state machine), `Capture` (motion-gated recording, segment writer), `Network` (API client, upload queue), `Pairing` (QR), `Tests/run.sh` | camera work |
 | `engine-worker/` | `contentstation_worker.py` claims jobs, downloads the segment, selects a window, runs pinned OpenShorts, uploads clip and thumbnail; `tests/` | render work |
+| `scripts/clip-lab/` | `index.html` (web UI), `server.py` (local uploads, segmented rendering, run history and drafts), `gemini_cli_bridge.py` (optional CLI model adapter) | local clipping UI; see its README |
 | `postiz/` | Pinned Postiz Compose stack, env examples, README with routes and limits | publishing service |
 | `deploy/` | Cloud Build and Cloud Run env files for the API image and the worker image | deploying |
 | `scripts/` | `local.mjs` (emulators + API + owner + worker), `postiz-local.mjs` (Postiz stack + isolation check), `smoke-e2e.py` (local real render), `smoke-hosted.mjs` (hosted upload → render), `sync-product.sh`, `setup-openshorts.sh`, `install-wall-device.sh` | running things |
-| `docs/` | Contract, hosted setup, architecture, reports, design handoff, archive; index in `docs/README.md` | reference |
+| `docs/` | Current contract, hosted setup, architecture and latest hosted/Postiz verification reports; index in `docs/README.md` | reference |
 | `firebase.json`, `firebase.hosted.json`, `*.rules`, `firestore.indexes.json` | Emulator config, hosted deploy targets, deny-all client rules | deploying |
 
 ## Firebase API (`firebase-api/src`)
@@ -87,10 +88,16 @@ Tests (`firebase-api/test`): `api.test.ts` (flows against the emulators), `reten
 | Screens | `screens/SignIn`, `Code`; onboarding `Shop`, `Wifi`, `Qr`, `Frame`, `Hours`, `Done`; `Home`, `ClipDetail`, `Camera`, `Rescan`, `Replace`, `Settings`, `Accounts` |
 | Publishing UI | `components/PublishPanel.tsx` (review sheet, outcome list), `hooks/usePublications.ts`, `lib/publishing.ts` (labels, shop-time conversion), `screens/Accounts.tsx` |
 | Shared UI | `components/Button`, `Sheet`, `Input`, `ClipCard`, `StripedPanel`, `StatusDot`, `BottomNav`, `QRCode`, `Toast` |
-| Helpers | `lib/format.ts` (dates in the shop timezone, phone formatting, hours summaries), `lib/status.ts` (camera status mapping), `lib/share.ts` (native share / download), `lib/style.ts` (prototype style strings), `lib/state.ts`, `lib/wifi.ts`, `lib/navigation.ts` |
+| Helpers | `lib/format.ts` (dates in the shop timezone, phone formatting, hours summaries), `lib/status.ts` (camera status mapping), `lib/share.ts` (native share / download), `lib/style.ts` (shared UI styles), `lib/state.ts`, `lib/wifi.ts`, `lib/navigation.ts` |
 | Hooks | `hooks/useSession`, `usePolling`, `useToast`, `useClipShare` |
 
 Tests sit next to the code as `*.test.ts(x)` and run with `npm --prefix owner-app test` (vitest, jsdom).
+
+## Clip Lab (`scripts/clip-lab`)
+
+`npm run clip-lab` serves `index.html` and local HTTP routes on `127.0.0.1:4320`. `server.py` accepts an upload or an existing local video, splits it into camera-sized segments, and calls `OpenShortsRenderer` from `engine-worker/contentstation_worker.py`. That keeps the clipping implementation shared with the cloud worker. Run records, source media and clips stay in ignored `.runtime/clip-lab/`.
+
+The UI provides progress, engine logs, source timelines, editable captions, downloads and optional Postiz drafts. AI selection uses configured Gemini access, with `gemini_cli_bridge.py` adapting a separately installed CLI when selected. These local routes do not use the Firebase API. See [Clip Lab setup](../scripts/clip-lab/README.md).
 
 ## Where a request travels
 
