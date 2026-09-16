@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "owner-app", "--", "--port", "5173", "--strictPort", "--host", "127.0.0.1"],
       "port": 5173
+    },
+    {
+      "name": "clip-lab",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["scripts/clip-lab/server.py"],
+      "port": 4320
     }
   ]
 }

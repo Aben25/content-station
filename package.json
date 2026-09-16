@@ -5,6 +5,7 @@
     "setup": "node scripts/local.mjs setup",
     "dev": "node scripts/local.mjs start",
     "local:config": "node scripts/local.mjs config",
+    "clip-lab": "python3 scripts/clip-lab/server.py",
     "test:worker": "cd engine-worker && python3 -m unittest discover -s tests -v",
     "build": "npm --prefix firebase-api run build && npm --prefix owner-app run typecheck && npm --prefix owner-app run build"
   }

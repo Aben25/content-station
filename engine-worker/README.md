@@ -21,6 +21,12 @@ Output upload and input download use API-issued capabilities restricted to the A
 
 The test suite verifies selection bounds, rejected inputs, origin restrictions, stale work cancellation and completion retry without re-rendering. Root `scripts/smoke-e2e.py` exercises the real Firebase emulator and renderer together.
 
+## Clip Lab (local testing on long-form footage)
+
+`npm run clip-lab` serves a local page at `http://127.0.0.1:4320` for trying this renderer on your own footage. Upload a video or give a local path; Clip Lab splits it into camera-sized segments (2, 5 or 9 minutes), runs each through `OpenShortsRenderer` exactly as the worker does, and shows live stages, the engine log, a source timeline and the resulting clips. Captions can be edited, clips downloaded, or saved to Postiz as drafts through the Postiz CLI; drafts never publish. Runs are stored in `.runtime/clip-lab/`.
+
+AI mode needs `GEMINI_API_KEY`, from the shell or a git-ignored `.runtime/clip-lab.env` line `GEMINI_API_KEY=...`. Without a key, a signed-in Gemini CLI is used through a local bridge on port 4321, though Google currently rejects personal-account sign-ins for headless use. On macOS, install `brew install ffmpeg-full`: Homebrew's default `ffmpeg` lacks libass, and OpenShorts then ships clips without burned captions.
+
 ## CPU container
 
 The image pins OpenShorts at `5a6f42807576eda572673b32f8c7625cb6d82a3c` and preserves its upstream `LICENSE`. PyTorch `2.11.0` and torchvision `0.26.0` come from PyTorch's CPU wheel index, avoiding CUDA runtime packages while retaining upstream's versions. The build preloads `yolov8n.pt`, imports the rendering dependency chain, confirms CUDA is unavailable, and performs a decoded 9:16 `--skip-analysis` render from synthetic media.
